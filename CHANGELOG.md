@@ -2,7 +2,37 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [1.12.2] - 2016-06-20
+### Updated
+- Updated plotly.min.js so the offline mode is using plotly.js v1.13.0
+	- Fix `Plotly.toImage` and `Plotly.downloadImage` bug specific to Chrome 51 on OSX
+	- Beta version of the scattermapbox trace type - which allows users to create mapbox-gl maps using the plotly.js API. Note that scattermapbox is only available through custom bundling in this release.
+	- See [the plotly.js CHANGELOG](https://github.com/plotly/plotly.js/blob/master/CHANGELOG.md#1130----2016-05-26) for additional additions and updates.
+
+### Added
+- The FigureFactory can now create gantt charts with `.create_gantt`. Check it out with:
+```
+import plotly.tools as tls
+help(tls.FigureFactory.create_gantt)
+```
+- Ability to download images in offline mode. By providing an extra keyword `image` to the existing plot calls, you can now download the images of the plots you make in offline mode.
+
+### Fixed
+- Fixed check for the height parameter passed to `_plot_html`, and now sets the correct `link text` for plots
+generated in offline mode.
+
+
+## [1.12.1] - 2016-06-19
+### Added
+- The FigureFactory can now create violin plots with `.create_violin`. Check it out with:
+```
+import plotly.tools as tls
+help(tls.FigureFactory.create_violin)
+```
+
+## [1.12.0] - 2016-06-06
+### Added
+- Added ability to enable/disable SSL certificate verification for streaming. Disabling SSL certification verification requires Python v2.7.9 / v3.4.3 (or above). This feature can be toggled via the `plotly_ssl_verification` configuration setting.
 
 ## [1.11.0] - 2016-05-27
 ### Updated
@@ -22,12 +52,18 @@ Note: This is a backwards incompatible change.
 
 - In `create_trisurf`, the parameter `dist_func` has been replaced by `color_func`. Users can now:
 	- Input a list of different color types (hex, tuple, rgb) to `colormap` to map colors divergently
-	- Input a list|array of hex and rgb colors to `color_func` to assign each simplex to a color 
+	- Input a list|array of hex and rgb colors to `color_func` to assign each simplex to a color
 
 ### Added
 - Added the option to load plotly.js from a CDN by setting the parameter `connected=True`
  in the `init_notebook_mode()` function call
- 
+- The FigureFactory can now create trisurf plots with `.create_trisurf`. Check it out with:
+```
+import plotly.tools as tls
+help(tls.FigureFactory.create_trisurf)
+```
+
+
 
 ## [1.10.0] - 2016-05-19
 ### Fixed

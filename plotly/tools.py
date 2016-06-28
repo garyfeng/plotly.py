@@ -28,6 +28,28 @@ DEFAULT_PLOTLY_COLORS = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
                          'rgb(227, 119, 194)', 'rgb(127, 127, 127)',
                          'rgb(188, 189, 34)', 'rgb(23, 190, 207)']
 
+
+REQUIRED_GANTT_KEYS = ['Task', 'Start', 'Finish']
+PLOTLY_SCALES = {'Greys': ['rgb(0,0,0)', 'rgb(255,255,255)'],
+                 'YlGnBu': ['rgb(8,29,88)', 'rgb(255,255,217)'],
+                 'Greens': ['rgb(0,68,27)', 'rgb(247,252,245)'],
+                 'YlOrRd': ['rgb(128,0,38)', 'rgb(255,255,204)'],
+                 'Bluered': ['rgb(0,0,255)', 'rgb(255,0,0)'],
+                 'RdBu': ['rgb(5,10,172)', 'rgb(178,10,28)'],
+                 'Reds': ['rgb(220,220,220)', 'rgb(178,10,28)'],
+                 'Blues': ['rgb(5,10,172)', 'rgb(220,220,220)'],
+                 'Picnic': ['rgb(0,0,255)', 'rgb(255,0,0)'],
+                 'Rainbow': ['rgb(150,0,90)', 'rgb(255,0,0)'],
+                 'Portland': ['rgb(12,51,131)', 'rgb(217,30,30)'],
+                 'Jet': ['rgb(0,0,131)', 'rgb(128,0,0)'],
+                 'Hot': ['rgb(0,0,0)', 'rgb(255,255,255)'],
+                 'Blackbody': ['rgb(0,0,0)', 'rgb(160,200,255)'],
+                 'Earth': ['rgb(0,0,130)', 'rgb(255,255,255)'],
+                 'Electric': ['rgb(0,0,0)', 'rgb(255,250,220)'],
+                 'Viridis': ['rgb(68,1,84)', 'rgb(253,231,37)']}
+
+# color constants for violin plot
+DEFAULT_FILLCOLOR = '#1f77b4'
 DEFAULT_HISTNORM = 'probability density'
 ALTERNATIVE_HISTNORM = 'probability'
 
@@ -1455,6 +1477,1488 @@ class FigureFactory(object):
     """
 
     @staticmethod
+    def _validate_gantt(df):
+        """
+        Validates the inputted dataframe or list
+        """
+        if _pandas_imported and isinstance(df, pd.core.frame.DataFrame):
+            # validate that df has all the required keys
+            for key in REQUIRED_GANTT_KEYS:
+                if key not in df:
+                    raise exceptions.PlotlyError(
+                        "The columns in your dataframe must include the "
+                        "keys".format(REQUIRED_GANTT_KEYS)
+                    )
+
+            num_of_rows = len(df.index)
+            chart = []
+            for index in range(num_of_rows):
+                task_dict = {}
+                for key in df:
+                    task_dict[key] = df.ix[index][key]
+                chart.append(task_dict)
+
+            return chart
+
+        # validate if df is a list
+        if not isinstance(df, list):
+            raise exceptions.PlotlyError("You must input either a dataframe "
+                                         "or a list of dictionaries.")
+
+        # validate if df is empty
+        if len(df) <= 0:
+            raise exceptions.PlotlyError("Your list is empty. It must contain "
+                                         "at least one dictionary.")
+        if not isinstance(df[0], dict):
+            raise exceptions.PlotlyError("Your list must only "
+                                         "include dictionaries.")
+        return df
+
+    @staticmethod
+    def _gantt(chart, colors, title, bar_width, showgrid_x, showgrid_y,
+               height, width, tasks=None, task_names=None, data=None):
+        """
+        Refer to FigureFactory.create_gantt() for docstring
+        """
+        if tasks is None:
+            tasks = []
+        if task_names is None:
+            task_names = []
+        if data is None:
+            data = []
+
+        for index in range(len(chart)):
+            task = dict(x0=chart[index]['Start'],
+                        x1=chart[index]['Finish'],
+                        name=chart[index]['Task'])
+            tasks.append(task)
+
+        shape_template = {
+            'type': 'rect',
+            'xref': 'x',
+            'yref': 'y',
+            'opacity': 1,
+            'line': {
+                'width': 0,
+            },
+            'yref': 'y',
+        }
+
+        color_index = 0
+        for index in range(len(tasks)):
+            tn = tasks[index]['name']
+            task_names.append(tn)
+            del tasks[index]['name']
+            tasks[index].update(shape_template)
+            tasks[index]['y0'] = index - bar_width
+            tasks[index]['y1'] = index + bar_width
+
+            # check if colors need to be looped
+            if color_index >= len(colors):
+                color_index = 0
+            tasks[index]['fillcolor'] = colors[color_index]
+            # Add a line for hover text and autorange
+            data.append(
+                dict(
+                    x=[tasks[index]['x0'], tasks[index]['x1']],
+                    y=[index, index],
+                    name='',
+                    marker={'color': 'white'}
+                )
+            )
+            color_index += 1
+
+        layout = dict(
+            title=title,
+            showlegend=False,
+            height=height,
+            width=width,
+            shapes=[],
+            hovermode='closest',
+            yaxis=dict(
+                showgrid=showgrid_y,
+                ticktext=task_names,
+                tickvals=list(range(len(tasks))),
+                range=[-1, len(tasks) + 1],
+                autorange=False,
+                zeroline=False,
+            ),
+            xaxis=dict(
+                showgrid=showgrid_x,
+                zeroline=False,
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=7,
+                             label='1w',
+                             step='day',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='1m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=6,
+                             label='6m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='YTD',
+                             step='year',
+                             stepmode='todate'),
+                        dict(count=1,
+                             label='1y',
+                             step='year',
+                             stepmode='backward'),
+                        dict(step='all')
+                    ])
+                ),
+                type='date'
+            )
+        )
+        layout['shapes'] = tasks
+
+        fig = dict(data=data, layout=layout)
+        return fig
+
+    @staticmethod
+    def _gantt_colorscale(chart, colors, title, index_col, show_colorbar,
+                          bar_width, showgrid_x, showgrid_y, height,
+                          width, tasks=None, task_names=None, data=None):
+        """
+        Refer to FigureFactory.create_gantt() for docstring
+        """
+        from numbers import Number
+        if tasks is None:
+            tasks = []
+        if task_names is None:
+            task_names = []
+        if data is None:
+            data = []
+        showlegend = False
+
+        for index in range(len(chart)):
+            task = dict(x0=chart[index]['Start'],
+                        x1=chart[index]['Finish'],
+                        name=chart[index]['Task'])
+            tasks.append(task)
+
+        shape_template = {
+            'type': 'rect',
+            'xref': 'x',
+            'yref': 'y',
+            'opacity': 1,
+            'line': {
+                'width': 0,
+            },
+            'yref': 'y',
+        }
+
+        # compute the color for task based on indexing column
+        if isinstance(chart[0][index_col], Number):
+            # check that colors has at least 2 colors
+            if len(colors) < 2:
+                raise exceptions.PlotlyError(
+                    "You must use at least 2 colors in 'colors' if you "
+                    "are using a colorscale. However only the first two "
+                    "colors given will be used for the lower and upper "
+                    "bounds on the colormap."
+                )
+            for index in range(len(tasks)):
+                tn = tasks[index]['name']
+                task_names.append(tn)
+                del tasks[index]['name']
+                tasks[index].update(shape_template)
+                tasks[index]['y0'] = index - bar_width
+                tasks[index]['y1'] = index + bar_width
+
+                # unlabel color
+                colors = FigureFactory._color_parser(
+                    colors, FigureFactory._unlabel_rgb
+                )
+                lowcolor = colors[0]
+                highcolor = colors[1]
+
+                intermed = (chart[index][index_col])/100.0
+                intermed_color = FigureFactory._find_intermediate_color(
+                    lowcolor, highcolor, intermed
+                )
+                intermed_color = FigureFactory._color_parser(
+                    intermed_color, FigureFactory._label_rgb
+                )
+                tasks[index]['fillcolor'] = intermed_color
+                # relabel colors with 'rgb'
+                colors = FigureFactory._color_parser(
+                    colors, FigureFactory._label_rgb
+                )
+
+                # add a line for hover text and autorange
+                data.append(
+                    dict(
+                        x=[tasks[index]['x0'], tasks[index]['x1']],
+                        y=[index, index],
+                        name='',
+                        marker={'color': 'white'}
+                    )
+                )
+
+            if show_colorbar is True:
+            # generate dummy data for colorscale visibility
+                data.append(
+                    dict(
+                        x=[tasks[index]['x0'], tasks[index]['x0']],
+                        y=[index, index],
+                        name='',
+                        marker={'color': 'white',
+                                'colorscale': [[0, colors[0]], [1, colors[1]]],
+                                'showscale': True,
+                                'cmax': 100,
+                                'cmin': 0}
+                    )
+                )
+
+        if isinstance(chart[0][index_col], str):
+            index_vals = []
+            for row in range(len(tasks)):
+                if chart[row][index_col] not in index_vals:
+                    index_vals.append(chart[row][index_col])
+
+            index_vals.sort()
+
+            if len(colors) < len(index_vals):
+                raise exceptions.PlotlyError(
+                    "Error. The number of colors in 'colors' must be no less "
+                    "than the number of unique index values in your group "
+                    "column."
+                )
+
+            # make a dictionary assignment to each index value
+            index_vals_dict = {}
+            # define color index
+            c_index = 0
+            for key in index_vals:
+                if c_index > len(colors) - 1:
+                    c_index = 0
+                index_vals_dict[key] = colors[c_index]
+                c_index += 1
+
+            for index in range(len(tasks)):
+                tn = tasks[index]['name']
+                task_names.append(tn)
+                del tasks[index]['name']
+                tasks[index].update(shape_template)
+                tasks[index]['y0'] = index - bar_width
+                tasks[index]['y1'] = index + bar_width
+
+                tasks[index]['fillcolor'] = index_vals_dict[
+                    chart[index][index_col]
+                ]
+
+                # add a line for hover text and autorange
+                data.append(
+                    dict(
+                        x=[tasks[index]['x0'], tasks[index]['x1']],
+                        y=[index, index],
+                        name='',
+                        marker={'color': 'white'}
+                    )
+                )
+
+            if show_colorbar is True:
+            # generate dummy data to generate legend
+                showlegend = True
+                for k, index_value in enumerate(index_vals):
+                    data.append(
+                        dict(
+                            x=[tasks[index]['x0'], tasks[index]['x0']],
+                            y=[k, k],
+                            showlegend=True,
+                            name=str(index_value),
+                            hoverinfo='none',
+                            marker=dict(
+                                color=colors[k],
+                                size=1
+                            )
+                        )
+                    )
+
+        layout = dict(
+            title=title,
+            showlegend=showlegend,
+            height=height,
+            width=width,
+            shapes=[],
+            hovermode='closest',
+            yaxis=dict(
+                showgrid=showgrid_y,
+                ticktext=task_names,
+                tickvals=list(range(len(tasks))),
+                range=[-1, len(tasks) + 1],
+                autorange=False,
+                zeroline=False,
+            ),
+            xaxis=dict(
+                showgrid=showgrid_x,
+                zeroline=False,
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=7,
+                             label='1w',
+                             step='day',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='1m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=6,
+                             label='6m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='YTD',
+                             step='year',
+                             stepmode='todate'),
+                        dict(count=1,
+                             label='1y',
+                             step='year',
+                             stepmode='backward'),
+                        dict(step='all')
+                    ])
+                ),
+                type='date'
+            )
+        )
+        layout['shapes'] = tasks
+
+        fig = dict(data=data, layout=layout)
+        return fig
+
+    @staticmethod
+    def _gantt_dict(chart, colors, title, index_col, show_colorbar, bar_width,
+                    showgrid_x, showgrid_y, height, width, tasks=None,
+                    task_names=None, data=None):
+        """
+        Refer to FigureFactory.create_gantt() for docstring
+        """
+        if tasks is None:
+            tasks = []
+        if task_names is None:
+            task_names = []
+        if data is None:
+            data = []
+        showlegend = False
+
+        for index in range(len(chart)):
+            task = dict(x0=chart[index]['Start'],
+                        x1=chart[index]['Finish'],
+                        name=chart[index]['Task'])
+            tasks.append(task)
+
+        shape_template = {
+            'type': 'rect',
+            'xref': 'x',
+            'yref': 'y',
+            'opacity': 1,
+            'line': {
+                'width': 0,
+            },
+            'yref': 'y',
+        }
+
+        index_vals = []
+        for row in range(len(tasks)):
+            if chart[row][index_col] not in index_vals:
+                index_vals.append(chart[row][index_col])
+
+        index_vals.sort()
+
+        # verify each value in index column appears in colors dictionary
+        for key in index_vals:
+            if key not in colors:
+                raise exceptions.PlotlyError(
+                    "If you are using colors as a dictionary, all of its "
+                    "keys must be all the values in the index column."
+                )
+
+        for index in range(len(tasks)):
+            tn = tasks[index]['name']
+            task_names.append(tn)
+            del tasks[index]['name']
+            tasks[index].update(shape_template)
+            tasks[index]['y0'] = index - bar_width
+            tasks[index]['y1'] = index + bar_width
+
+            tasks[index]['fillcolor'] = colors[chart[index][index_col]]
+
+            # add a line for hover text and autorange
+            data.append(
+                dict(
+                    x=[tasks[index]['x0'], tasks[index]['x1']],
+                    y=[index, index],
+                    name='',
+                    marker={'color': 'white'}
+                )
+            )
+
+        if show_colorbar is True:
+        # generate dummy data to generate legend
+            showlegend = True
+            for k, index_value in enumerate(index_vals):
+                data.append(
+                    dict(
+                        x=[tasks[index]['x0'], tasks[index]['x0']],
+                        y=[k, k],
+                        showlegend=True,
+                        hoverinfo='none',
+                        name=str(index_value),
+                        marker=dict(
+                            color=colors[index_value],
+                            size=1
+                        )
+                    )
+                )
+
+        layout = dict(
+            title=title,
+            showlegend=showlegend,
+            height=height,
+            width=width,
+            shapes=[],
+            hovermode='closest',
+            yaxis=dict(
+                showgrid=showgrid_y,
+                ticktext=task_names,
+                tickvals=list(range(len(tasks))),
+                range=[-1, len(tasks) + 1],
+                autorange=False,
+                zeroline=False,
+            ),
+            xaxis=dict(
+                showgrid=showgrid_x,
+                zeroline=False,
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=7,
+                             label='1w',
+                             step='day',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='1m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=6,
+                             label='6m',
+                             step='month',
+                             stepmode='backward'),
+                        dict(count=1,
+                             label='YTD',
+                             step='year',
+                             stepmode='todate'),
+                        dict(count=1,
+                             label='1y',
+                             step='year',
+                             stepmode='backward'),
+                        dict(step='all')
+                    ])
+                ),
+                type='date'
+            )
+        )
+        layout['shapes'] = tasks
+
+        fig = dict(data=data, layout=layout)
+        return fig
+
+    @staticmethod
+    def create_gantt(df, colors=None, index_col=None, show_colorbar=False,
+                     reverse_colors=False, title='Gantt Chart',
+                     bar_width=0.2, showgrid_x=False, showgrid_y=False,
+                     height=600, width=900, tasks=None,
+                     task_names=None, data=None):
+        """
+        Returns figure for a gantt chart
+
+        :param (array|list) df: input data for gantt chart. Must be either a
+            a dataframe or a list. If dataframe, the columns must include
+            'Task', 'Start' and 'Finish'. Other columns can be included and
+            used for indexing. If a list, its elements must be dictionaries
+            with the same required column headers: 'Task', 'Start' and
+            'Finish'.
+        :param (str|list|dict|tuple) colors: either a plotly scale name, an
+            rgb or hex color, a color tuple or a list of colors. An rgb color
+            is of the form 'rgb(x, y, z)' where x, y, z belong to the interval
+            [0, 255] and a color tuple is a tuple of the form (a, b, c) where
+            a, b and c belong to [0, 1]. If colors is a list, it must
+            contain the valid color types aforementioned as its members.
+            If a dictionary, all values of the indexing column must be keys in
+            colors.
+        :param (str|float) index_col: the column header (if df is a data
+            frame) that will function as the indexing column. If df is a list,
+            index_col must be one of the keys in all the items of df.
+        :param (bool) show_colorbar: determines if colorbar will be visible.
+            Only applies if values in the index column are numeric.
+        :param (bool) reverse_colors: reverses the order of selected colors
+        :param (str) title: the title of the chart
+        :param (float) bar_width: the width of the horizontal bars in the plot
+        :param (bool) showgrid_x: show/hide the x-axis grid
+        :param (bool) showgrid_y: show/hide the y-axis grid
+        :param (float) height: the height of the chart
+        :param (float) width: the width of the chart
+
+        Example 1: Simple Gantt Chart
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        # Make data for chart
+        df = [dict(Task="Job A", Start='2009-01-01', Finish='2009-02-30'),
+              dict(Task="Job B", Start='2009-03-05', Finish='2009-04-15'),
+              dict(Task="Job C", Start='2009-02-20', Finish='2009-05-30')]
+
+        # Create a figure
+        fig = FF.create_gantt(df)
+
+        # Plot the data
+        py.iplot(fig, filename='Simple Gantt Chart', world_readable=True)
+        ```
+
+        Example 2: Index by Column with Numerical Entries
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        # Make data for chart
+        df = [dict(Task="Job A", Start='2009-01-01',
+                   Finish='2009-02-30', Complete=10),
+              dict(Task="Job B", Start='2009-03-05',
+                   Finish='2009-04-15', Complete=60),
+              dict(Task="Job C", Start='2009-02-20',
+                   Finish='2009-05-30', Complete=95)]
+
+        # Create a figure with Plotly colorscale
+        fig = FF.create_gantt(df, colors='Blues', index_col='Complete',
+                              show_colorbar=True, bar_width=0.5,
+                              showgrid_x=True, showgrid_y=True)
+
+        # Plot the data
+        py.iplot(fig, filename='Numerical Entries', world_readable=True)
+        ```
+
+        Example 3: Index by Column with String Entries
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        # Make data for chart
+        df = [dict(Task="Job A", Start='2009-01-01',
+                   Finish='2009-02-30', Resource='Apple'),
+              dict(Task="Job B", Start='2009-03-05',
+                   Finish='2009-04-15', Resource='Grape'),
+              dict(Task="Job C", Start='2009-02-20',
+                   Finish='2009-05-30', Resource='Banana')]
+
+        # Create a figure with Plotly colorscale
+        fig = FF.create_gantt(df, colors=['rgb(200, 50, 25)',
+                                          (1, 0, 1),
+                                          '#6c4774'],
+                              index_col='Resource',
+                              reverse_colors=True,
+                              show_colorbar=True)
+
+        # Plot the data
+        py.iplot(fig, filename='String Entries', world_readable=True)
+        ```
+
+        Example 4: Use a dictionary for colors
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        # Make data for chart
+        df = [dict(Task="Job A", Start='2009-01-01',
+                   Finish='2009-02-30', Resource='Apple'),
+              dict(Task="Job B", Start='2009-03-05',
+                   Finish='2009-04-15', Resource='Grape'),
+              dict(Task="Job C", Start='2009-02-20',
+                   Finish='2009-05-30', Resource='Banana')]
+
+        # Make a dictionary of colors
+        colors = {'Apple': 'rgb(255, 0, 0)',
+                  'Grape': 'rgb(170, 14, 200)',
+                  'Banana': (1, 1, 0.2)}
+
+        # Create a figure with Plotly colorscale
+        fig = FF.create_gantt(df, colors=colors,
+                              index_col='Resource',
+                              show_colorbar=True)
+
+        # Plot the data
+        py.iplot(fig, filename='dictioanry colors', world_readable=True)
+        ```
+
+        Example 5: Use a pandas dataframe
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        import pandas as pd
+
+        # Make data as a dataframe
+        df = pd.DataFrame([['Run', '2010-01-01', '2011-02-02', 10],
+                           ['Fast', '2011-01-01', '2012-06-05', 55],
+                           ['Eat', '2012-01-05', '2013-07-05', 94]],
+                          columns=['Task', 'Start', 'Finish', 'Complete'])
+
+        # Create a figure with Plotly colorscale
+        fig = FF.create_gantt(df, colors='Blues', index_col='Complete',
+                              show_colorbar=True, bar_width=0.5,
+                              showgrid_x=True, showgrid_y=True)
+
+        # Plot the data
+        py.iplot(fig, filename='data with dataframe', world_readable=True)
+        ```
+        """
+        # validate gantt input data
+        chart = FigureFactory._validate_gantt(df)
+
+        if index_col:
+            if index_col not in chart[0]:
+                raise exceptions.PlotlyError(
+                    "In order to use an indexing column and assign colors to "
+                    "the values of the index, you must choose an actual "
+                    "column name in the dataframe or key if a list of "
+                    "dictionaries is being used.")
+
+            # validate gantt index column
+            index_list = []
+            for dictionary in chart:
+                index_list.append(dictionary[index_col])
+            FigureFactory._validate_index(index_list)
+
+        # Validate colors
+        if isinstance(colors, dict):
+            colors = FigureFactory._validate_colors_dict(colors, 'rgb')
+        else:
+            colors = FigureFactory._validate_colors(colors, 'rgb')
+
+        if reverse_colors is True:
+            colors.reverse()
+
+        if not index_col:
+            if isinstance(colors, dict):
+                raise exceptions.PlotlyError(
+                    "Error. You have set colors to a dictionary but have not "
+                    "picked an index. An index is required if you are "
+                    "assigning colors to particular values in a dictioanry."
+                )
+            fig = FigureFactory._gantt(
+                chart, colors, title, bar_width, showgrid_x, showgrid_y,
+                height, width, tasks=None, task_names=None, data=None
+            )
+            return fig
+        else:
+            if not isinstance(colors, dict):
+                fig = FigureFactory._gantt_colorscale(
+                    chart, colors, title, index_col, show_colorbar, bar_width,
+                    showgrid_x, showgrid_y, height, width,
+                    tasks=None, task_names=None, data=None
+                )
+                return fig
+            else:
+                fig = FigureFactory._gantt_dict(
+                    chart, colors, title, index_col, show_colorbar, bar_width,
+                    showgrid_x, showgrid_y, height, width,
+                    tasks=None, task_names=None, data=None
+                )
+                return fig
+
+    @staticmethod
+    def _validate_colors(colors, colortype='tuple'):
+        """
+        Validates color(s) and returns a list of color(s) of a specified type
+        """
+        from numbers import Number
+        if colors is None:
+            colors = DEFAULT_PLOTLY_COLORS
+
+        if isinstance(colors, str):
+            if colors in PLOTLY_SCALES:
+                colors = PLOTLY_SCALES[colors]
+            elif 'rgb' in colors or '#' in colors:
+                colors = [colors]
+            else:
+                raise exceptions.PlotlyError(
+                    "If your colors variable is a string, it must be a "
+                    "Plotly scale, an rgb color or a hex color.")
+
+        elif isinstance(colors, tuple):
+            if isinstance(colors[0], Number):
+                colors = [colors]
+            else:
+                colors = list(colors)
+
+        # convert color elements in list to tuple color
+        for j, each_color in enumerate(colors):
+            if 'rgb' in each_color:
+                each_color = FigureFactory._color_parser(
+                    each_color, FigureFactory._unlabel_rgb
+                )
+                for value in each_color:
+                    if value > 255.0:
+                        raise exceptions.PlotlyError(
+                            "Whoops! The elements in your rgb colors "
+                            "tuples cannot exceed 255.0."
+                        )
+                each_color = FigureFactory._color_parser(
+                    each_color, FigureFactory._unconvert_from_RGB_255
+                )
+                colors[j] = each_color
+
+            if '#' in each_color:
+                each_color = FigureFactory._color_parser(
+                    each_color, FigureFactory._hex_to_rgb
+                )
+                each_color = FigureFactory._color_parser(
+                    each_color, FigureFactory._unconvert_from_RGB_255
+                )
+
+                colors[j] = each_color
+
+            if isinstance(each_color, tuple):
+                for value in each_color:
+                    if value > 1.0:
+                        raise exceptions.PlotlyError(
+                            "Whoops! The elements in your colors tuples "
+                            "cannot exceed 1.0."
+                        )
+                colors[j] = each_color
+
+        if colortype == 'rgb':
+            for j, each_color in enumerate(colors):
+                rgb_color = FigureFactory._color_parser(
+                    each_color, FigureFactory._convert_to_RGB_255
+                )
+                colors[j] = FigureFactory._color_parser(
+                    rgb_color, FigureFactory._label_rgb
+                )
+
+        return colors
+
+    @staticmethod
+    def _validate_colors_dict(colors, colortype='tuple'):
+        """
+        Validates dictioanry of color(s)
+        """
+        # validate each color element in the dictionary
+        for key in colors:
+            if 'rgb' in colors[key]:
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._unlabel_rgb
+                )
+                for value in colors[key]:
+                    if value > 255.0:
+                        raise exceptions.PlotlyError(
+                            "Whoops! The elements in your rgb colors "
+                            "tuples cannot exceed 255.0."
+                        )
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._unconvert_from_RGB_255
+                )
+
+            if '#' in colors[key]:
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._hex_to_rgb
+                )
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._unconvert_from_RGB_255
+                )
+
+            if isinstance(colors[key], tuple):
+                for value in colors[key]:
+                    if value > 1.0:
+                        raise exceptions.PlotlyError(
+                            "Whoops! The elements in your colors tuples "
+                            "cannot exceed 1.0."
+                        )
+
+        if colortype == 'rgb':
+            for key in colors:
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._convert_to_RGB_255
+                )
+                colors[key] = FigureFactory._color_parser(
+                    colors[key], FigureFactory._label_rgb
+                )
+
+        return colors
+
+    @staticmethod
+    def _calc_stats(data):
+        """
+        Calculate statistics for use in violin plot.
+        """
+        import numpy as np
+
+        x = np.asarray(data, np.float)
+        vals_min = np.min(x)
+        vals_max = np.max(x)
+        q2 = np.percentile(x, 50, interpolation='linear')
+        q1 = np.percentile(x, 25, interpolation='lower')
+        q3 = np.percentile(x, 75, interpolation='higher')
+        iqr = q3 - q1
+        whisker_dist = 1.5 * iqr
+
+        # in order to prevent drawing whiskers outside the interval
+        # of data one defines the whisker positions as:
+        d1 = np.min(x[x >= (q1 - whisker_dist)])
+        d2 = np.max(x[x <= (q3 + whisker_dist)])
+        return {
+            'min': vals_min,
+            'max': vals_max,
+            'q1': q1,
+            'q2': q2,
+            'q3': q3,
+            'd1': d1,
+            'd2': d2
+        }
+
+    @staticmethod
+    def _make_half_violin(x, y, fillcolor='#1f77b4',
+                          linecolor='rgb(0, 0, 0)'):
+        """
+        Produces a sideways probability distribution fig violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        text = ['(pdf(y), y)=(' + '{:0.2f}'.format(x[i]) +
+                ', ' + '{:0.2f}'.format(y[i]) + ')'
+                for i in range(len(x))]
+
+        return graph_objs.Scatter(
+            x=x,
+            y=y,
+            mode='lines',
+            name='',
+            text=text,
+            fill='tonextx',
+            fillcolor=fillcolor,
+            line=graph_objs.Line(width=0.5, color=linecolor, shape='spline'),
+            hoverinfo='text',
+            opacity=0.5
+        )
+
+    @staticmethod
+    def _make_violin_rugplot(vals, pdf_max, distance,
+                             color='#1f77b4'):
+        """
+        Returns a rugplot fig for a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        return graph_objs.Scatter(
+            y=vals,
+            x=[-pdf_max-distance]*len(vals),
+            marker=graph_objs.Marker(
+                color=color,
+                symbol='line-ew-open'
+            ),
+            mode='markers',
+            name='',
+            showlegend=False,
+            hoverinfo='y'
+        )
+
+    @staticmethod
+    def _make_quartiles(q1, q3):
+        """
+        Makes the upper and lower quartiles for a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        return graph_objs.Scatter(
+            x=[0, 0],
+            y=[q1, q3],
+            text=['lower-quartile: ' + '{:0.2f}'.format(q1),
+                  'upper-quartile: ' + '{:0.2f}'.format(q3)],
+            mode='lines',
+            line=graph_objs.Line(
+                width=4,
+                color='rgb(0,0,0)'
+            ),
+            hoverinfo='text'
+        )
+
+    @staticmethod
+    def _make_median(q2):
+        """
+        Formats the 'median' hovertext for a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        return graph_objs.Scatter(
+            x=[0],
+            y=[q2],
+            text=['median: ' + '{:0.2f}'.format(q2)],
+            mode='markers',
+            marker=dict(symbol='square',
+                        color='rgb(255,255,255)'),
+            hoverinfo='text'
+        )
+
+    @staticmethod
+    def _make_non_outlier_interval(d1, d2):
+        """
+        Returns the scatterplot fig of most of a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        return graph_objs.Scatter(
+            x=[0, 0],
+            y=[d1, d2],
+            name='',
+            mode='lines',
+            line=graph_objs.Line(width=1.5,
+                                 color='rgb(0,0,0)')
+        )
+
+    @staticmethod
+    def _make_XAxis(xaxis_title, xaxis_range):
+        """
+        Makes the x-axis for a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        xaxis = graph_objs.XAxis(title=xaxis_title,
+                                 range=xaxis_range,
+                                 showgrid=False,
+                                 zeroline=False,
+                                 showline=False,
+                                 mirror=False,
+                                 ticks='',
+                                 showticklabels=False,
+                                 )
+        return xaxis
+
+    @staticmethod
+    def _make_YAxis(yaxis_title):
+        """
+        Makes the y-axis for a violin plot.
+        """
+        from plotly.graph_objs import graph_objs
+
+        yaxis = graph_objs.YAxis(title=yaxis_title,
+                                 showticklabels=True,
+                                 autorange=True,
+                                 ticklen=4,
+                                 showline=True,
+                                 zeroline=False,
+                                 showgrid=False,
+                                 mirror=False)
+        return yaxis
+
+    @staticmethod
+    def _violinplot(vals, fillcolor='#1f77b4', rugplot=True):
+        """
+        Refer to FigureFactory.create_violin() for docstring.
+        """
+        import numpy as np
+        from scipy import stats
+
+        vals = np.asarray(vals, np.float)
+        #  summary statistics
+        vals_min = FigureFactory._calc_stats(vals)['min']
+        vals_max = FigureFactory._calc_stats(vals)['max']
+        q1 = FigureFactory._calc_stats(vals)['q1']
+        q2 = FigureFactory._calc_stats(vals)['q2']
+        q3 = FigureFactory._calc_stats(vals)['q3']
+        d1 = FigureFactory._calc_stats(vals)['d1']
+        d2 = FigureFactory._calc_stats(vals)['d2']
+
+        # kernel density estimation of pdf
+        pdf = stats.gaussian_kde(vals)
+        # grid over the data interval
+        xx = np.linspace(vals_min, vals_max, 100)
+        # evaluate the pdf at the grid xx
+        yy = pdf(xx)
+        max_pdf = np.max(yy)
+        # distance from the violin plot to rugplot
+        distance = (2.0 * max_pdf)/10 if rugplot else 0
+        # range for x values in the plot
+        plot_xrange = [-max_pdf - distance - 0.1, max_pdf + 0.1]
+        plot_data = [FigureFactory._make_half_violin(
+                     -yy, xx, fillcolor=fillcolor),
+                     FigureFactory._make_half_violin(
+                         yy, xx, fillcolor=fillcolor),
+                     FigureFactory._make_non_outlier_interval(d1, d2),
+                     FigureFactory._make_quartiles(q1, q3),
+                     FigureFactory._make_median(q2)]
+        if rugplot:
+            plot_data.append(FigureFactory._make_violin_rugplot(
+                vals,
+                max_pdf,
+                distance=distance,
+                color=fillcolor)
+            )
+        return plot_data, plot_xrange
+
+    @staticmethod
+    def _violin_no_colorscale(data, data_header, group_header, colors,
+                              use_colorscale, group_stats,
+                              height, width, title):
+        """
+        Refer to FigureFactory.create_violin() for docstring.
+
+        Returns fig for violin plot without colorscale.
+
+        """
+        from plotly.graph_objs import graph_objs
+        import numpy as np
+
+        # collect all group names
+        group_name = []
+        for name in data[group_header]:
+            if name not in group_name:
+                group_name.append(name)
+        group_name.sort()
+
+        gb = data.groupby([group_header])
+        L = len(group_name)
+
+        fig = make_subplots(rows=1, cols=L,
+                            shared_yaxes=True,
+                            horizontal_spacing=0.025,
+                            print_grid=True)
+        color_index = 0
+        for k, gr in enumerate(group_name):
+            vals = np.asarray(gb.get_group(gr)[data_header], np.float)
+            if color_index >= len(colors):
+                color_index = 0
+            plot_data, plot_xrange = FigureFactory._violinplot(
+                vals,
+                fillcolor=colors[color_index]
+            )
+            layout = graph_objs.Layout()
+
+            for item in plot_data:
+                fig.append_trace(item, 1, k + 1)
+            color_index += 1
+
+            # add violin plot labels
+            fig['layout'].update({'xaxis{}'.format(k + 1):
+                                  FigureFactory._make_XAxis(group_name[k],
+                                                            plot_xrange)})
+
+        # set the sharey axis style
+        fig['layout'].update(
+            {'yaxis{}'.format(1): FigureFactory._make_YAxis('')}
+        )
+        fig['layout'].update(
+            title=title,
+            showlegend=False,
+            hovermode='closest',
+            autosize=False,
+            height=height,
+            width=width
+        )
+
+        return fig
+
+    @staticmethod
+    def _violin_colorscale(data, data_header, group_header, colors,
+                           use_colorscale, group_stats, height, width, title):
+        """
+        Refer to FigureFactory.create_violin() for docstring.
+
+        Returns fig for violin plot with colorscale.
+
+        """
+        from plotly.graph_objs import graph_objs
+        import numpy as np
+
+        # collect all group names
+        group_name = []
+        for name in data[group_header]:
+            if name not in group_name:
+                group_name.append(name)
+        group_name.sort()
+
+        # make sure all group names are keys in group_stats
+        for group in group_name:
+            if group not in group_stats:
+                raise exceptions.PlotlyError("All values/groups in the index "
+                                             "column must be represented "
+                                             "as a key in group_stats.")
+
+        gb = data.groupby([group_header])
+        L = len(group_name)
+
+        fig = make_subplots(rows=1, cols=L,
+                            shared_yaxes=True,
+                            horizontal_spacing=0.025,
+                            print_grid=True)
+
+        # prepare low and high color for colorscale
+        lowcolor = FigureFactory._color_parser(
+            colors[0], FigureFactory._unlabel_rgb
+        )
+        highcolor = FigureFactory._color_parser(
+            colors[1], FigureFactory._unlabel_rgb
+        )
+
+        # find min and max values in group_stats
+        group_stats_values = []
+        for key in group_stats:
+            group_stats_values.append(group_stats[key])
+
+        max_value = max(group_stats_values)
+        min_value = min(group_stats_values)
+
+        for k, gr in enumerate(group_name):
+            vals = np.asarray(gb.get_group(gr)[data_header], np.float)
+
+            # find intermediate color from colorscale
+            intermed = (group_stats[gr] - min_value) / (max_value - min_value)
+            intermed_color = FigureFactory._find_intermediate_color(
+                lowcolor, highcolor, intermed
+            )
+
+            plot_data, plot_xrange = FigureFactory._violinplot(
+                vals,
+                fillcolor='rgb{}'.format(intermed_color)
+            )
+            layout = graph_objs.Layout()
+
+            for item in plot_data:
+                fig.append_trace(item, 1, k + 1)
+            fig['layout'].update({'xaxis{}'.format(k + 1):
+                                  FigureFactory._make_XAxis(group_name[k],
+                                                            plot_xrange)})
+        # add colorbar to plot
+        trace_dummy = graph_objs.Scatter(
+            x=[0],
+            y=[0],
+            mode='markers',
+            marker=dict(
+                size=2,
+                cmin=min_value,
+                cmax=max_value,
+                colorscale=[[0, colors[0]],
+                            [1, colors[1]]],
+                showscale=True),
+            showlegend=False,
+        )
+        fig.append_trace(trace_dummy, 1, L)
+
+        # set the sharey axis style
+        fig['layout'].update(
+            {'yaxis{}'.format(1): FigureFactory._make_YAxis('')}
+        )
+        fig['layout'].update(
+            title=title,
+            showlegend=False,
+            hovermode='closest',
+            autosize=False,
+            height=height,
+            width=width
+        )
+
+        return fig
+
+    @staticmethod
+    def _violin_dict(data, data_header, group_header, colors, use_colorscale,
+                     group_stats, height, width, title):
+        """
+        Refer to FigureFactory.create_violin() for docstring.
+
+        Returns fig for violin plot without colorscale.
+
+        """
+        from plotly.graph_objs import graph_objs
+        import numpy as np
+
+        # collect all group names
+        group_name = []
+        for name in data[group_header]:
+            if name not in group_name:
+                group_name.append(name)
+        group_name.sort()
+
+        # check if all group names appear in colors dict
+        for group in group_name:
+            if group not in colors:
+                raise exceptions.PlotlyError("If colors is a dictionary, all "
+                                             "the group names must appear as "
+                                             "keys in colors.")
+
+        gb = data.groupby([group_header])
+        L = len(group_name)
+
+        fig = make_subplots(rows=1, cols=L,
+                            shared_yaxes=True,
+                            horizontal_spacing=0.025,
+                            print_grid=True)
+
+        for k, gr in enumerate(group_name):
+            vals = np.asarray(gb.get_group(gr)[data_header], np.float)
+            plot_data, plot_xrange = FigureFactory._violinplot(
+                vals,
+                fillcolor=colors[gr]
+            )
+            layout = graph_objs.Layout()
+
+            for item in plot_data:
+                fig.append_trace(item, 1, k + 1)
+
+            # add violin plot labels
+            fig['layout'].update({'xaxis{}'.format(k + 1):
+                                  FigureFactory._make_XAxis(group_name[k],
+                                                            plot_xrange)})
+
+        # set the sharey axis style
+        fig['layout'].update(
+            {'yaxis{}'.format(1): FigureFactory._make_YAxis('')}
+        )
+        fig['layout'].update(
+            title=title,
+            showlegend=False,
+            hovermode='closest',
+            autosize=False,
+            height=height,
+            width=width
+        )
+
+        return fig
+
+    @staticmethod
+    def create_violin(data, data_header=None, group_header=None,
+                      colors=None, use_colorscale=False, group_stats=None,
+                      height=450, width=600, title='Violin and Rug Plot'):
+        """
+        Returns figure for a violin plot
+
+        :param (list|array) data: accepts either a list of numerical values,
+            a list of dictionaries all with identical keys and at least one
+            column of numeric values, or a pandas dataframe with at least one
+            column of numbers
+        :param (str) data_header: the header of the data column to be used
+            from an inputted pandas dataframe. Not applicable if 'data' is
+            a list of numeric values
+        :param (str) group_header: applicable if grouping data by a variable.
+            'group_header' must be set to the name of the grouping variable.
+        :param (str|tuple|list|dict) colors: either a plotly scale name,
+            an rgb or hex color, a color tuple, a list of colors or a
+            dictionary. An rgb color is of the form 'rgb(x, y, z)' where
+            x, y and z belong to the interval [0, 255] and a color tuple is a
+            tuple of the form (a, b, c) where a, b and c belong to [0, 1].
+            If colors is a list, it must contain valid color types as its
+            members.
+        :param (bool) use_colorscale: Only applicable if grouping by another
+            variable. Will implement a colorscale based on the first 2 colors
+            of param colors. This means colors must be a list with at least 2
+            colors in it (Plotly colorscales are accepted since they map to a
+            list of two rgb colors)
+        :param (dict) group_stats: a dictioanry where each key is a unique
+            value from the group_header column in data. Each value must be a
+            number and will be used to color the violin plots if a colorscale
+            is being used
+        :param (float) height: the height of the violin plot
+        :param (float) width: the width of the violin plot
+        :param (str) title: the title of the violin plot
+
+        Example 1: Single Violin Plot
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+        from plotly.graph_objs import graph_objs
+
+        import numpy as np
+        from scipy import stats
+
+        # create list of random values
+        data_list = np.random.randn(100)
+        data_list.tolist()
+
+        # create violin fig
+        fig = FF.create_violin(data_list, colors='#604d9e')
+
+        # plot
+        py.iplot(fig, filename='Violin Plot')
+        ```
+
+        Example 2: Multiple Violin Plots with Qualitative Coloring
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+        from plotly.graph_objs import graph_objs
+
+        import numpy as np
+        import pandas as pd
+        from scipy import stats
+
+        # create dataframe
+        np.random.seed(619517)
+        Nr=250
+        y = np.random.randn(Nr)
+        gr = np.random.choice(list("ABCDE"), Nr)
+        norm_params=[(0, 1.2), (0.7, 1), (-0.5, 1.4), (0.3, 1), (0.8, 0.9)]
+
+        for i, letter in enumerate("ABCDE"):
+            y[gr == letter] *=norm_params[i][1]+ norm_params[i][0]
+        df = pd.DataFrame(dict(Score=y, Group=gr))
+
+        # create violin fig
+        fig = FF.create_violin(df, data_header='Score', group_header='Group',
+                               height=600, width=1000)
+
+        # plot
+        py.iplot(fig, filename='Violin Plot with Coloring')
+        ```
+
+        Example 3: Violin Plots with Colorscale
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+        from plotly.graph_objs import graph_objs
+
+        import numpy as np
+        import pandas as pd
+        from scipy import stats
+
+        # create dataframe
+        np.random.seed(619517)
+        Nr=250
+        y = np.random.randn(Nr)
+        gr = np.random.choice(list("ABCDE"), Nr)
+        norm_params=[(0, 1.2), (0.7, 1), (-0.5, 1.4), (0.3, 1), (0.8, 0.9)]
+
+        for i, letter in enumerate("ABCDE"):
+            y[gr == letter] *=norm_params[i][1]+ norm_params[i][0]
+        df = pd.DataFrame(dict(Score=y, Group=gr))
+
+        # define header params
+        data_header = 'Score'
+        group_header = 'Group'
+
+        # make groupby object with pandas
+        group_stats = {}
+        groupby_data = df.groupby([group_header])
+
+        for group in "ABCDE":
+            data_from_group = groupby_data.get_group(group)[data_header]
+            # take a stat of the grouped data
+            stat = np.median(data_from_group)
+            # add to dictionary
+            group_stats[group] = stat
+
+        # create violin fig
+        fig = FF.create_violin(df, data_header='Score', group_header='Group',
+                               height=600, width=1000, use_colorscale=True,
+                               group_stats=group_stats)
+
+        # plot
+        py.iplot(fig, filename='Violin Plot with Colorscale')
+        ```
+        """
+        from plotly.graph_objs import graph_objs
+        from numbers import Number
+
+        # Validate colors
+        if isinstance(colors, dict):
+            valid_colors = FigureFactory._validate_colors_dict(colors, 'rgb')
+        else:
+            valid_colors = FigureFactory._validate_colors(colors, 'rgb')
+
+        # validate data and choose plot type
+        if group_header is None:
+            if isinstance(data, list):
+                if len(data) <= 0:
+                    raise exceptions.PlotlyError("If data is a list, it must be "
+                                                 "nonempty and contain either "
+                                                 "numbers or dictionaries.")
+
+                if not all(isinstance(element, Number) for element in data):
+                    raise exceptions.PlotlyError("If data is a list, it must "
+                                                 "contain only numbers.")
+
+            if _pandas_imported and isinstance(data, pd.core.frame.DataFrame):
+                if data_header is None:
+                    raise exceptions.PlotlyError("data_header must be the "
+                                                 "column name with the "
+                                                 "desired numeric data for "
+                                                 "the violin plot.")
+
+                data = data[data_header].values.tolist()
+
+            # call the plotting functions
+            plot_data, plot_xrange = FigureFactory._violinplot(
+                data, fillcolor=valid_colors[0]
+            )
+
+            layout = graph_objs.Layout(
+                title=title,
+                autosize=False,
+                font=graph_objs.Font(size=11),
+                height=height,
+                showlegend=False,
+                width=width,
+                xaxis=FigureFactory._make_XAxis('', plot_xrange),
+                yaxis=FigureFactory._make_YAxis(''),
+                hovermode='closest'
+            )
+            layout['yaxis'].update(dict(showline=False,
+                                        showticklabels=False,
+                                        ticks=''))
+
+            fig = graph_objs.Figure(data=graph_objs.Data(plot_data),
+                                    layout=layout)
+
+            return fig
+
+        else:
+            if not isinstance(data, pd.core.frame.DataFrame):
+                raise exceptions.PlotlyError("Error. You must use a pandas "
+                                             "DataFrame if you are using a "
+                                             "group header.")
+
+            if data_header is None:
+                raise exceptions.PlotlyError("data_header must be the column "
+                                             "name with the desired numeric "
+                                             "data for the violin plot.")
+
+            if use_colorscale is False:
+                if isinstance(valid_colors, dict):
+                    # validate colors dict choice below
+                    fig = FigureFactory._violin_dict(
+                        data, data_header, group_header, valid_colors,
+                        use_colorscale, group_stats, height, width, title
+                    )
+                    return fig
+                else:
+                    fig = FigureFactory._violin_no_colorscale(
+                        data, data_header, group_header, valid_colors,
+                        use_colorscale, group_stats, height, width, title
+                    )
+                    return fig
+            else:
+                if isinstance(valid_colors, dict):
+                    raise exceptions.PlotlyError("The colors param cannot be "
+                                                 "a dictionary if you are "
+                                                 "using a colorscale.")
+
+                if len(valid_colors) < 2:
+                    raise exceptions.PlotlyError("colors must be a list with "
+                                                 "at least 2 colors. A "
+                                                 "Plotly scale is allowed.")
+
+                if not isinstance(group_stats, dict):
+                    raise exceptions.PlotlyError("Your group_stats param "
+                                                 "must be a dictionary.")
+
+                fig = FigureFactory._violin_colorscale(
+                    data, data_header, group_header, valid_colors,
+                    use_colorscale, group_stats, height, width, title
+                )
+                return fig
+
+    @staticmethod
     def _find_intermediate_color(lowcolor, highcolor, intermed):
         """
         Returns the color at a given distance between two colors
@@ -1468,10 +2972,38 @@ class FigureFactory(object):
         diff_1 = float(highcolor[1] - lowcolor[1])
         diff_2 = float(highcolor[2] - lowcolor[2])
 
-        inter_colors = np.array([lowcolor[0] + intermed * diff_0,
-                                 lowcolor[1] + intermed * diff_1,
-                                 lowcolor[2] + intermed * diff_2])
+        inter_colors = (lowcolor[0] + intermed * diff_0,
+                        lowcolor[1] + intermed * diff_1,
+                        lowcolor[2] + intermed * diff_2)
         return inter_colors
+
+    @staticmethod
+    def _color_parser(colors, function):
+        """
+        Takes color(s) and a function and applys the function on the color(s)
+
+        In particular, this function identifies whether the given color object
+        is an iterable or not and applies the given color-parsing function to
+        the color or iterable of colors. If given an iterable, it will only be
+        able to work with it if all items in the iterable are of the same type
+        - rgb string, hex string or tuple
+
+        """
+        from numbers import Number
+        if isinstance(colors, str):
+            return function(colors)
+
+        if isinstance(colors, tuple) and isinstance(colors[0], Number):
+            return function(colors)
+
+        if hasattr(colors, '__iter__'):
+            if isinstance(colors, tuple):
+                new_color_tuple = tuple(function(item) for item in colors)
+                return new_color_tuple
+
+            else:
+                new_color_list = [function(item) for item in colors]
+                return new_color_list
 
     @staticmethod
     def _unconvert_from_RGB_255(colors):
@@ -1483,34 +3015,21 @@ class FigureFactory(object):
         a value between 0 and 1
 
         """
-        if isinstance(colors, tuple):
+        un_rgb_color = (colors[0]/(255.0),
+                        colors[1]/(255.0),
+                        colors[2]/(255.0))
 
-            un_rgb_color = (colors[0]/(255.0),
-                            colors[1]/(255.0),
-                            colors[2]/(255.0))
-
-            return un_rgb_color
-
-        if isinstance(colors, list):
-            un_rgb_colors = []
-            for color in colors:
-                un_rgb_color = (color[0]/(255.0),
-                                color[1]/(255.0),
-                                color[2]/(255.0))
-
-                un_rgb_colors.append(un_rgb_color)
-
-            return un_rgb_colors
+        return un_rgb_color
 
     @staticmethod
-    def _map_array2color(array, colormap, vmin, vmax):
+    def _map_face2color(face, colormap, vmin, vmax):
         """
-        Normalize values in array by vmin/vmax and return plotly color strings.
+        Normalize facecolor values by vmin/vmax and return rgb-color strings
 
-        This function takes an array of values along with a colormap and a
-        minimum (vmin) and maximum (vmax) range of possible z values for the
-        given parametrized surface. It returns an rgb color based on the
-        relative position of zval between vmin and vmax
+        This function takes a tuple color along with a colormap and a minimum
+        (vmin) and maximum (vmax) range of possible mean distances for the
+        given parametrized surface. It returns an rgb color based on the mean
+        distance between vmin and vmax
 
         """
         if vmin >= vmax:
@@ -1518,20 +3037,37 @@ class FigureFactory(object):
                                          "and vmax. The vmin value cannot be "
                                          "bigger than or equal to the value "
                                          "of vmax.")
-        # find distance t of zval from vmin to vmax where the distance
-        # is normalized to be between 0 and 1
-        t = (array - vmin) / float((vmax - vmin))
-        t_colors = FigureFactory._find_intermediate_color(colormap[0],
-                                                          colormap[1],
-                                                          t)
-        t_colors = t_colors * 255.
-        labelled_colors = ['rgb(%s, %s, %s)' % (i, j, k)
-                           for i, j, k in t_colors.T]
-        return labelled_colors
+
+        if len(colormap) == 1:
+            # color each triangle face with the same color in colormap
+            face_color = colormap[0]
+            face_color = FigureFactory._convert_to_RGB_255(face_color)
+            face_color = FigureFactory._label_rgb(face_color)
+        else:
+            if face == vmax:
+                # pick last color in colormap
+                face_color = colormap[-1]
+                face_color = FigureFactory._convert_to_RGB_255(face_color)
+                face_color = FigureFactory._label_rgb(face_color)
+            else:
+                # find the normalized distance t of a triangle face between
+                # vmin and vmax where the distance is between 0 and 1
+                t = (face - vmin) / float((vmax - vmin))
+                low_color_index = int(t / (1./(len(colormap) - 1)))
+
+                face_color = FigureFactory._find_intermediate_color(
+                    colormap[low_color_index],
+                    colormap[low_color_index + 1],
+                    t * (len(colormap) - 1) - low_color_index)
+                face_color = FigureFactory._convert_to_RGB_255(face_color)
+                face_color = FigureFactory._label_rgb(face_color)
+
+        return face_color
 
     @staticmethod
     def _trisurf(x, y, z, simplices, colormap=None, color_func=None,
-                 plot_edges=False, x_edge=None, y_edge=None, z_edge=None):
+                 plot_edges=False, x_edge=None, y_edge=None, z_edge=None,
+                 facecolor=None):
         """
         Refer to FigureFactory.create_trisurf() for docstring
         """
@@ -1556,8 +3092,10 @@ class FigureFactory(object):
             if len(color_func) != len(simplices):
                 raise ValueError("If color_func is a list/array, it must "
                                  "be the same length as simplices.")
-                # convert all colors to rgb
-                for index in range(len(color_func)):
+
+            # convert all colors to rgb
+            for index in range(len(color_func)):
+                if isinstance(color_func[index], str):
                     if '#' in color_func[index]:
                         foo = FigureFactory._hex_to_rgb(color_func[index])
                         color_func[index] = FigureFactory._label_rgb(foo)
@@ -1581,10 +3119,16 @@ class FigureFactory(object):
         else:
             min_mean_dists = np.min(mean_dists)
             max_mean_dists = np.max(mean_dists)
-            facecolor = FigureFactory._map_array2color(mean_dists,
-                                                       colormap,
-                                                       min_mean_dists,
-                                                       max_mean_dists)
+
+            if facecolor is None:
+                facecolor = []
+            for index in range(len(mean_dists)):
+                color = FigureFactory._map_face2color(mean_dists[index],
+                                                      colormap,
+                                                      min_mean_dists,
+                                                      max_mean_dists)
+                facecolor.append(color)
+
         # Make sure we have arrays to speed up plotting
         facecolor = np.asarray(facecolor)
         ii, jj, kk = simplices.T
@@ -1653,10 +3197,12 @@ class FigureFactory(object):
         :param (array) simplices: an array of shape (ntri, 3) where ntri is
             the number of triangles in the triangularization. Each row of the
             array contains the indicies of the verticies of each triangle
-        :param (str|list) colormap: either a plotly scale name, or a list
-            containing 2 triplets. These triplets must be of the form (a,b,c)
-            or 'rgb(x,y,z)' where a,b,c belong to the interval [0,1] and x,y,z
-            belong to [0,255]
+        :param (str|tuple|list) colormap: either a plotly scale name, an rgb
+            or hex color, a color tuple or a list of colors. An rgb color is
+            of the form 'rgb(x, y, z)' where x, y, z belong to the interval
+            [0, 255] and a color tuple is a tuple of the form (a, b, c) where
+            a, b and c belong to [0, 1]. If colormap is a list, it must
+            contain the valid color types aforementioned as its members.
         :param (function|list) color_func: The parameter that determines the
             coloring of the surface. Takes either a function with 3 arguments
             x, y, z or a list/array of color values the same length as
@@ -1860,106 +3406,9 @@ class FigureFactory(object):
         ```
         """
         from plotly.graph_objs import graph_objs
-        plotly_scales = {'Greys': ['rgb(0,0,0)', 'rgb(255,255,255)'],
-                         'YlGnBu': ['rgb(8,29,88)', 'rgb(255,255,217)'],
-                         'Greens': ['rgb(0,68,27)', 'rgb(247,252,245)'],
-                         'YlOrRd': ['rgb(128,0,38)', 'rgb(255,255,204)'],
-                         'Bluered': ['rgb(0,0,255)', 'rgb(255,0,0)'],
-                         'RdBu': ['rgb(5,10,172)', 'rgb(178,10,28)'],
-                         'Reds': ['rgb(220,220,220)', 'rgb(178,10,28)'],
-                         'Blues': ['rgb(5,10,172)', 'rgb(220,220,220)'],
-                         'Picnic': ['rgb(0,0,255)', 'rgb(255,0,0)'],
-                         'Rainbow': ['rgb(150,0,90)', 'rgb(255,0,0)'],
-                         'Portland': ['rgb(12,51,131)', 'rgb(217,30,30)'],
-                         'Jet': ['rgb(0,0,131)', 'rgb(128,0,0)'],
-                         'Hot': ['rgb(0,0,0)', 'rgb(255,255,255)'],
-                         'Blackbody': ['rgb(0,0,0)', 'rgb(160,200,255)'],
-                         'Earth': ['rgb(0,0,130)', 'rgb(255,255,255)'],
-                         'Electric': ['rgb(0,0,0)', 'rgb(255,250,220)'],
-                         'Viridis': ['rgb(68,1,84)', 'rgb(253,231,37)']}
 
         # Validate colormap
-        if colormap is None:
-            colormap = [DEFAULT_PLOTLY_COLORS[0],
-                        DEFAULT_PLOTLY_COLORS[1]]
-            colormap = FigureFactory._unlabel_rgb(colormap)
-            colormap = FigureFactory._unconvert_from_RGB_255(colormap)
-
-        if isinstance(colormap, str):
-            if colormap in plotly_scales:
-                colormap = plotly_scales[colormap]
-                colormap = FigureFactory._unlabel_rgb(colormap)
-                colormap = FigureFactory._unconvert_from_RGB_255(colormap)
-
-            elif 'rgb' in colormap:
-                # put colormap in list
-                colors_list = []
-                colors_list.append(colormap)
-                colormap = colors_list
-
-                colormap = FigureFactory._unlabel_rgb(colormap)
-                colormap = FigureFactory._unconvert_from_RGB_255(colormap)
-
-            elif '#' in colormap:
-                colormap = FigureFactory._hex_to_rgb(colormap)
-                colormap = FigureFactory._unconvert_from_RGB_255(colormap)
-
-                # put colormap in list
-                colors_list = []
-                colors_list.append(colormap)
-                colormap = colors_list
-
-            else:
-                scale_keys = list(plotly_scales.keys())
-                raise exceptions.PlotlyError("If you input a string "
-                                             "for 'colormap', it must "
-                                             "either be a Plotly "
-                                             "colorscale, an 'rgb' "
-                                             "color or a hex color."
-                                             "Valid plotly colorscale "
-                                             "names are {}".format(scale_keys))
-        elif isinstance(colormap, tuple):
-            colors_list = []
-            colors_list.append(colormap)
-            colormap = colors_list
-
-        elif isinstance(colormap, list):
-            new_colormap = []
-            for color in colormap:
-                if 'rgb' in color:
-                    color = FigureFactory._unlabel_rgb(color)
-
-                    for value in color:
-                        if value > 255.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in your "
-                                                         "rgb colormap "
-                                                         "tuples cannot "
-                                                         "exceed 255.0.")
-
-                    color = FigureFactory._unconvert_from_RGB_255(color)
-                    new_colormap.append(color)
-                elif '#' in color:
-                    color = FigureFactory._hex_to_rgb(color)
-                    color = FigureFactory._unconvert_from_RGB_255(color)
-                    new_colormap.append(color)
-                elif isinstance(color, tuple):
-
-                    for value in color:
-                        if value > 1.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in "
-                                                         "your colormap "
-                                                         "tuples cannot "
-                                                         "exceed 1.0.")
-                    new_colormap.append(color)
-            colormap = new_colormap
-
-        else:
-            raise exceptions.PlotlyError("You must input a valid colormap. "
-                                         "Valid types include a plotly scale, "
-                                         "rgb, hex or tuple color, or lastly "
-                                         "a list of any color types.")
+        colormap = FigureFactory._validate_colors(colormap, 'tuple')
 
         data1 = FigureFactory._trisurf(x, y, z, simplices,
                                        color_func=color_func,
@@ -2250,11 +3699,16 @@ class FigureFactory(object):
 
             # Convert colormap to list of n RGB tuples
             if colormap_type == 'seq':
-                foo = FigureFactory._unlabel_rgb(colormap)
+                foo = FigureFactory._color_parser(
+                    colormap, FigureFactory._unlabel_rgb
+                )
                 foo = FigureFactory._n_colors(foo[0],
                                               foo[1],
                                               n_colors_len)
-                theme = FigureFactory._label_rgb(foo)
+                theme = FigureFactory._color_parser(
+                    foo, FigureFactory._label_rgb
+                )
+
             if colormap_type == 'cat':
                 # leave list of colors the same way
                 theme = colormap
@@ -2419,11 +3873,16 @@ class FigureFactory(object):
 
                 # Convert colormap to list of n RGB tuples
                 if colormap_type == 'seq':
-                    foo = FigureFactory._unlabel_rgb(colormap)
+                    foo = FigureFactory._color_parser(
+                        colormap, FigureFactory._unlabel_rgb
+                    )
                     foo = FigureFactory._n_colors(foo[0],
                                                   foo[1],
                                                   len(intervals))
-                    theme = FigureFactory._label_rgb(foo)
+                    theme = FigureFactory._color_parser(
+                        foo, FigureFactory._label_rgb
+                    )
+
                 if colormap_type == 'cat':
                     # leave list of colors the same way
                     theme = colormap
@@ -2877,22 +4336,10 @@ class FigureFactory(object):
     @staticmethod
     def _convert_to_RGB_255(colors):
         """
-        Return a (list of) tuple(s) where each element is multiplied by 255
-
-        Takes a tuple or a list of tuples where each element of each tuple is
-        between 0 and 1. Returns the same tuple(s) where each tuple element is
-        multiplied by 255
+        Multiplies each element of a triplet by 255
         """
 
-        if isinstance(colors, tuple):
-            return (colors[0]*255.0, colors[1]*255.0, colors[2]*255.0)
-
-        else:
-            colors_255 = []
-            for color in colors:
-                rgb_color = (color[0]*255.0, color[1]*255.0, color[2]*255.0)
-                colors_255.append(rgb_color)
-            return colors_255
+        return (colors[0]*255.0, colors[1]*255.0, colors[2]*255.0)
 
     @staticmethod
     def _n_colors(lowcolor, highcolor, n_colors):
@@ -2923,22 +4370,9 @@ class FigureFactory(object):
     @staticmethod
     def _label_rgb(colors):
         """
-        Takes tuple(s) (a, b, c) and returns rgb color(s) 'rgb(a, b, c)'
-
-        Takes either a list or a single color tuple of the form (a, b, c) and
-        returns the same color(s) with each tuple replaced by a string
-        'rgb(a, b, c)'
-
+        Takes tuple (a, b, c) and returns an rgb color 'rgb(a, b, c)'
         """
-        if isinstance(colors, tuple):
-            return 'rgb{}'.format(colors)
-        else:
-            colors_label = []
-            for color in colors:
-                color_label = 'rgb{}'.format(color)
-                colors_label.append(color_label)
-
-            return colors_label
+        return ('rgb(%s, %s, %s)' % (colors[0], colors[1], colors[2]))
 
     @staticmethod
     def _unlabel_rgb(colors):
@@ -2949,52 +4383,25 @@ class FigureFactory(object):
         such colors and returns the color tuples in tuple(s) (a, b, c)
 
         """
-        if isinstance(colors, str):
-            str_vals = ''
-            for index in range(len(colors)):
-                try:
-                    float(colors[index])
+        str_vals = ''
+        for index in range(len(colors)):
+            try:
+                float(colors[index])
+                str_vals = str_vals + colors[index]
+            except ValueError:
+                if colors[index] == ',' or colors[index] == '.':
                     str_vals = str_vals + colors[index]
-                except ValueError:
-                    if (colors[index] == ',') or (colors[index] == '.'):
-                        str_vals = str_vals + colors[index]
 
-            str_vals = str_vals + ','
-            numbers = []
-            str_num = ''
-            for char in str_vals:
-                if char != ',':
-                    str_num = str_num + char
-                else:
-                    numbers.append(float(str_num))
-                    str_num = ''
-            return (numbers[0], numbers[1], numbers[2])
-
-        if isinstance(colors, list):
-            unlabelled_colors = []
-            for color in colors:
-                str_vals = ''
-                for index in range(len(color)):
-                    try:
-                        float(color[index])
-                        str_vals = str_vals + color[index]
-                    except ValueError:
-                        if (color[index] == ',') or (color[index] == '.'):
-                            str_vals = str_vals + color[index]
-
-                str_vals = str_vals + ','
-                numbers = []
+        str_vals = str_vals + ','
+        numbers = []
+        str_num = ''
+        for char in str_vals:
+            if char != ',':
+                str_num = str_num + char
+            else:
+                numbers.append(float(str_num))
                 str_num = ''
-                for char in str_vals:
-                    if char != ',':
-                        str_num = str_num + char
-                    else:
-                        numbers.append(float(str_num))
-                        str_num = ''
-                unlabelled_tuple = (numbers[0], numbers[1], numbers[2])
-                unlabelled_colors.append(unlabelled_tuple)
-
-            return unlabelled_colors
+        return (numbers[0], numbers[1], numbers[2])
 
     @staticmethod
     def create_scatterplotmatrix(df, index=None, endpts=None, diag='scatter',
@@ -3206,154 +4613,16 @@ class FigureFactory(object):
             headers = []
         if index_vals is None:
             index_vals = []
-        plotly_scales = {'Greys': ['rgb(0,0,0)', 'rgb(255,255,255)'],
-                         'YlGnBu': ['rgb(8,29,88)', 'rgb(255,255,217)'],
-                         'Greens': ['rgb(0,68,27)', 'rgb(247,252,245)'],
-                         'YlOrRd': ['rgb(128,0,38)', 'rgb(255,255,204)'],
-                         'Bluered': ['rgb(0,0,255)', 'rgb(255,0,0)'],
-                         'RdBu': ['rgb(5,10,172)', 'rgb(178,10,28)'],
-                         'Reds': ['rgb(220,220,220)', 'rgb(178,10,28)'],
-                         'Blues': ['rgb(5,10,172)', 'rgb(220,220,220)'],
-                         'Picnic': ['rgb(0,0,255)', 'rgb(255,0,0)'],
-                         'Rainbow': ['rgb(150,0,90)', 'rgb(255,0,0)'],
-                         'Portland': ['rgb(12,51,131)', 'rgb(217,30,30)'],
-                         'Jet': ['rgb(0,0,131)', 'rgb(128,0,0)'],
-                         'Hot': ['rgb(0,0,0)', 'rgb(255,255,255)'],
-                         'Blackbody': ['rgb(0,0,0)', 'rgb(160,200,255)'],
-                         'Earth': ['rgb(0,0,130)', 'rgb(255,255,255)'],
-                         'Electric': ['rgb(0,0,0)', 'rgb(255,250,220)'],
-                         'Viridis': ['rgb(68,1,84)', 'rgb(253,231,37)']}
 
         FigureFactory._validate_scatterplotmatrix(df, index, diag,
                                                   colormap_type, **kwargs)
 
         # Validate colormap
-        if colormap is None:
-            colormap = DEFAULT_PLOTLY_COLORS
-
-        if isinstance(colormap, str):
-            if colormap in plotly_scales:
-                colormap = plotly_scales[colormap]
-
-            elif 'rgb' in colormap:
-                colormap = FigureFactory._unlabel_rgb(colormap)
-                for value in colormap:
-                    if value > 255.0:
-                        raise exceptions.PlotlyError("Whoops! The "
-                                                     "elements in your "
-                                                     "rgb colormap "
-                                                     "tuples cannot "
-                                                     "exceed 255.0.")
-                colormap = FigureFactory._label_rgb(colormap)
-
-                # put colormap in list
-                colors_list = []
-                colors_list.append(colormap)
-                colormap = colors_list
-
-            elif '#' in colormap:
-                colormap = FigureFactory._hex_to_rgb(colormap)
-                colormap = FigureFactory._label_rgb(colormap)
-
-                # put colormap in list
-                colors_list = []
-                colors_list.append(colormap)
-                colormap = colors_list
-
-            else:
-                scale_keys = list(plotly_scales.keys())
-                raise exceptions.PlotlyError("If you input a string "
-                                             "for 'colormap', it must "
-                                             "either be a Plotly "
-                                             "colorscale, an 'rgb' "
-                                             "color or a hex color."
-                                             "Valid plotly colorscale "
-                                             "names are {}".format(scale_keys))
-        elif isinstance(colormap, tuple):
-            for value in colormap:
-                if value > 1.0:
-                    raise exceptions.PlotlyError("Whoops! The "
-                                                 "elements in "
-                                                 "your colormap "
-                                                 "tuples cannot "
-                                                 "exceed 1.0.")
-
-            colors_list = []
-            colors_list.append(colormap)
-            colormap = colors_list
-
-            colormap = FigureFactory._convert_to_RGB_255(colormap)
-            colormap = FigureFactory._label_rgb(colormap)
-
-        elif isinstance(colormap, list):
-            new_colormap = []
-            for color in colormap:
-                if 'rgb' in color:
-                    color = FigureFactory._unlabel_rgb(color)
-
-                    for value in color:
-                        if value > 255.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in your "
-                                                         "rgb colormap "
-                                                         "tuples cannot "
-                                                         "exceed 255.0.")
-
-                    color = FigureFactory._label_rgb(color)
-                    new_colormap.append(color)
-                elif '#' in color:
-                    color = FigureFactory._hex_to_rgb(color)
-                    color = FigureFactory._label_rgb(color)
-                    new_colormap.append(color)
-                elif isinstance(color, tuple):
-                    for value in color:
-                        if value > 1.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in "
-                                                         "your colormap "
-                                                         "tuples cannot "
-                                                         "exceed 1.0.")
-                    color = FigureFactory._convert_to_RGB_255(color)
-                    color = FigureFactory._label_rgb(color)
-                    new_colormap.append(color)
-            colormap = new_colormap
-
-        elif isinstance(colormap, dict):
-            for name in colormap:
-                if 'rgb' in colormap[name]:
-                    color = FigureFactory._unlabel_rgb(colormap[name])
-                    for value in color:
-                        if value > 255.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in your "
-                                                         "rgb colormap "
-                                                         "tuples cannot "
-                                                         "exceed 255.0.")
-
-                elif '#' in colormap[name]:
-                    color = FigureFactory._hex_to_rgb(colormap[name])
-                    color = FigureFactory._label_rgb(color)
-                    colormap[name] = color
-
-                elif isinstance(colormap[name], tuple):
-                    for value in colormap[name]:
-                        if value > 1.0:
-                            raise exceptions.PlotlyError("Whoops! The "
-                                                         "elements in "
-                                                         "your colormap "
-                                                         "tuples cannot "
-                                                         "exceed 1.0.")
-                    color = FigureFactory._convert_to_RGB_255(colormap[name])
-                    color = FigureFactory._label_rgb(color)
-                    colormap[name] = color
-
+        if isinstance(colormap, dict):
+            colormap = FigureFactory._validate_colors_dict(colormap, 'rgb')
         else:
-            raise exceptions.PlotlyError("You must input a valid colormap. "
-                                         "Valid types include a plotly scale, "
-                                         "rgb, hex or tuple color, a list of "
-                                         "any color types, or a dictionary "
-                                         "with index names each assigned "
-                                         "to a color.")
+            colormap = FigureFactory._validate_colors(colormap, 'rgb')
+
         if not index:
             for name in df:
                 headers.append(name)
@@ -3392,29 +4661,19 @@ class FigureFactory(object):
                                                      "dictionary, all the "
                                                      "names in the index "
                                                      "must be keys.")
-
-                figure = FigureFactory._scatterplot_dict(dataframe,
-                                                         headers,
-                                                         diag,
-                                                         size, height,
-                                                         width, title,
-                                                         index,
-                                                         index_vals,
-                                                         endpts,
-                                                         colormap,
-                                                         colormap_type,
-                                                         **kwargs)
+                figure = FigureFactory._scatterplot_dict(
+                    dataframe, headers, diag, size, height, width, title,
+                    index, index_vals, endpts, colormap, colormap_type,
+                    **kwargs
+                )
                 return figure
 
             else:
-                figure = FigureFactory._scatterplot_theme(dataframe, headers,
-                                                          diag, size,
-                                                          height, width,
-                                                          title, index,
-                                                          index_vals,
-                                                          endpts, colormap,
-                                                          colormap_type,
-                                                          **kwargs)
+                figure = FigureFactory._scatterplot_theme(
+                    dataframe, headers, diag, size, height, width, title,
+                    index, index_vals, endpts, colormap, colormap_type,
+                    **kwargs
+                )
                 return figure
 
     @staticmethod
