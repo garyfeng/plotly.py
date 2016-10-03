@@ -842,71 +842,79 @@ class TestTrisurf(NumpyTestUtilsMixin, TestCase):
         )
 
         exp_trisurf_plot = {
-        'data': [
-            {
-                'facecolor': ['rgb(144.0, 94.5, 132.0)',
-                              'rgb(23.0, 190.0, 207.0)',
-                              'rgb(144.0, 94.5, 132.0)',
-                              'rgb(31.0, 119.0, 180.0)',
-                              'rgb(144.0, 94.5, 132.0)',
-                              'rgb(31.0, 119.0, 180.0)',
-                              'rgb(144.0, 94.5, 132.0)',
-                              'rgb(23.0, 190.0, 207.0)'],
-                'i': [3, 1, 1, 5, 7, 3, 5, 7],
-                'j': [1, 3, 5, 1, 3, 7, 7, 5],
-                'k': [4, 0, 4, 2, 4, 6, 4, 8],
-                'name': '',
-                'type': 'mesh3d',
-                'x': np.array([-1.,  0.,  1., -1.,  0.,  1., -1.,  0.,  1.]),
-                'y': np.array([-1., -1., -1.,  0.,  0.,  0.,  1.,  1.,  1.]),
-                'z': np.array([ 1., -0., -1., -0.,  0.,  0., -1.,  0.,  1.])
-            },
-            {
-                'line': {'color': 'rgb(50, 50, 50)', 'width': 1.5},
-                'mode': 'lines',
-                'type': 'scatter3d',
-                'x': [-1.0, 0.0, 0.0, -1.0, None, 0.0, -1.0, -1.0, 0.0, None,
-                      0.0, 1.0, 0.0, 0.0, None, 1.0, 0.0, 1.0, 1.0, None, 0.0,
-                      -1.0, 0.0, 0.0, None, -1.0, 0.0, -1.0, -1.0, None, 1.0,
-                      0.0, 0.0, 1.0, None, 0.0, 1.0, 1.0, 0.0, None],
-                'y': [0.0, -1.0, 0.0, 0.0, None, -1.0, 0.0, -1.0, -1.0, None,
-                      -1.0, 0.0, 0.0, -1.0, None, 0.0, -1.0, -1.0, 0.0, None,
-                      1.0, 0.0, 0.0, 1.0, None, 0.0, 1.0, 1.0, 0.0, None, 0.0,
-                      1.0, 0.0, 0.0, None, 1.0, 0.0, 1.0, 1.0, None],
-                'z': [-0.0, -0.0, 0.0, -0.0, None, -0.0, -0.0, 1.0, -0.0,
-                      None, -0.0, 0.0, 0.0, -0.0, None, 0.0, -0.0, -1.0, 0.0,
-                      None, 0.0, -0.0, 0.0, 0.0, None, -0.0, 0.0, -1.0, -0.0,
-                      None, 0.0, 0.0, 0.0, 0.0, None, 0.0, 0.0, 1.0, 0.0, None]
-            }
-        ],
-        'layout': {
-            'height': 800,
-            'scene': {'aspectratio': {'x': 1, 'y': 1, 'z': 1},
-            'xaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
-            'gridcolor': 'rgb(255, 255, 255)',
-            'showbackground': True,
-            'zerolinecolor': 'rgb(255, 255, 255)'},
-            'yaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
-            'gridcolor': 'rgb(255, 255, 255)',
-            'showbackground': True,
-            'zerolinecolor': 'rgb(255, 255, 255)'},
-            'zaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
-            'gridcolor': 'rgb(255, 255, 255)',
-            'showbackground': True,
-            'zerolinecolor': 'rgb(255, 255, 255)'}},
-            'title': 'Trisurf Plot',
-            'width': 800
+            'data': [{'facecolor': ['rgb(143, 123, 97)', 'rgb(255, 127, 14)',
+                                    'rgb(143, 123, 97)', 'rgb(31, 119, 180)',
+                                    'rgb(143, 123, 97)', 'rgb(31, 119, 180)',
+                                    'rgb(143, 123, 97)', 'rgb(255, 127, 14)'],
+                     'i': [3, 1, 1, 5, 7, 3, 5, 7],
+                     'j': [1, 3, 5, 1, 3, 7, 7, 5],
+                     'k': [4, 0, 4, 2, 4, 6, 4, 8],
+                     'name': '',
+                     'type': 'mesh3d',
+                     'x': [-1.,  0.,  1., -1.,  0.,  1., -1.,  0.,  1.],
+                     'y': [-1., -1., -1.,  0.,  0.,  0.,  1.,  1.,  1.],
+                     'z': [1., -0., -1., -0.,  0.,  0., -1.,  0.,  1.]},
+                     {'line': {'color': 'rgb(50, 50, 50)', 'width': 1.5},
+                      'mode': 'lines',
+                      'showlegend': False,
+                      'type': 'scatter3d',
+                      'x': [-1.0, 0.0, 0.0, -1.0, None, 0.0, -1.0, -1.0, 0.0,
+                            None, 0.0, 1.0, 0.0, 0.0, None, 1.0, 0.0, 1.0,
+                            1.0, None, 0.0, -1.0, 0.0, 0.0, None, -1.0, 0.0,
+                            -1.0, -1.0, None, 1.0, 0.0, 0.0, 1.0, None, 0.0,
+                            1.0, 1.0, 0.0, None],
+                      'y': [0.0, -1.0, 0.0, 0.0, None, -1.0, 0.0, -1.0, -1.0,
+                            None, -1.0, 0.0, 0.0, -1.0, None, 0.0, -1.0, -1.0,
+                            0.0, None, 1.0, 0.0, 0.0, 1.0, None, 0.0, 1.0,
+                            1.0, 0.0, None, 0.0, 1.0, 0.0, 0.0, None, 1.0,
+                            0.0, 1.0, 1.0, None],
+                      'z': [-0.0, -0.0, 0.0, -0.0, None, -0.0, -0.0, 1.0,
+                            -0.0, None, -0.0, 0.0, 0.0, -0.0, None, 0.0, -0.0,
+                            -1.0, 0.0, None, 0.0, -0.0, 0.0, 0.0, None, -0.0,
+                            0.0, -1.0, -0.0, None, 0.0, 0.0, 0.0, 0.0, None,
+                            0.0, 0.0, 1.0, 0.0, None]},
+                     {'hoverinfo': 'None',
+                      'marker': {'color': [-0.33333333333333331,
+                                           0.33333333333333331],
+                                 'colorscale': [[0.0, 'rgb(31, 119, 180)'],
+                                                [1.0, 'rgb(255, 127, 14)']],
+                                 'showscale': True,
+                                 'size': 0.1},
+                      'mode': 'markers',
+                      'showlegend': False,
+                      'type': 'scatter3d',
+                      'x': [-1.],
+                      'y': [-1.],
+                      'z': [1.]}],
+            'layout': {'height': 800,
+                       'scene': {'aspectratio': {'x': 1, 'y': 1, 'z': 1},
+                                 'xaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
+                                           'gridcolor': 'rgb(255, 255, 255)',
+                                           'showbackground': True,
+                                           'zerolinecolor': 'rgb(255, 255, 255)'},
+                                 'yaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
+                                           'gridcolor': 'rgb(255, 255, 255)',
+                                           'showbackground': True,
+                                           'zerolinecolor': 'rgb(255, 255, 255)'},
+                                 'zaxis': {'backgroundcolor': 'rgb(230, 230, 230)',
+                                           'gridcolor': 'rgb(255, 255, 255)',
+                                           'showbackground': True,
+                                           'zerolinecolor': 'rgb(255, 255, 255)'}},
+                       'title': 'Trisurf Plot',
+                       'width': 800}
         }
-        }
-
-        self.assert_dict_equal(test_trisurf_plot['layout'],
-                               exp_trisurf_plot['layout'])
 
         self.assert_dict_equal(test_trisurf_plot['data'][0],
                                exp_trisurf_plot['data'][0])
 
         self.assert_dict_equal(test_trisurf_plot['data'][1],
                                exp_trisurf_plot['data'][1])
+
+        self.assert_dict_equal(test_trisurf_plot['data'][2],
+                               exp_trisurf_plot['data'][2])
+
+        self.assert_dict_equal(test_trisurf_plot['layout'],
+                               exp_trisurf_plot['layout'])
 
         # Test passing custom colors
         colors_raw = np.random.randn(simplices.shape[0])
@@ -1232,13 +1240,13 @@ class TestScatterPlotMatrix(NumpyTestUtilsMixin, TestCase):
         )
 
         exp_scatter_plot_matrix = {
-            'data': [{'marker': {'color': 'rgb(128.0, 0.0, 38.0)'},
+            'data': [{'marker': {'color': 'rgb(128, 0, 38)'},
                       'showlegend': False,
                       'type': 'histogram',
                       'x': [2, -15, -2, 0],
                       'xaxis': 'x1',
                       'yaxis': 'y1'},
-                     {'marker': {'color': 'rgb(255.0, 255.0, 204.0)'},
+                     {'marker': {'color': 'rgb(255, 255, 204)'},
                       'showlegend': False,
                       'type': 'histogram',
                       'x': [6, 5],
@@ -1295,7 +1303,7 @@ class TestGantt(NumpyTestUtilsMixin, TestCase):
                        'shapes': [{'opacity': 1,
                                    'y1': 0.2,
                                    'xref': 'x',
-                                   'fillcolor': 'rgb(31.0, 119.0, 180.0)',
+                                   'fillcolor': 'rgb(31, 119, 180)',
                                    'yref': 'y',
                                    'y0': -0.2,
                                    'x0': '2009-01-01',
@@ -1305,7 +1313,7 @@ class TestGantt(NumpyTestUtilsMixin, TestCase):
                                   {'opacity': 1,
                                    'y1': 1.2,
                                    'xref': 'x',
-                                   'fillcolor': 'rgb(255.0, 127.0, 14.0)',
+                                   'fillcolor': 'rgb(255, 127, 14)',
                                    'yref': 'y',
                                    'y0': 0.8,
                                    'x0': '2009-03-05',
@@ -1514,7 +1522,7 @@ class TestViolin(NumpyTestUtilsMixin, TestCase):
 
         exp_violin = {
             'data': [{'fill': 'tonextx',
-                     'fillcolor': 'rgb(31.0, 119.0, 180.0)',
+                     'fillcolor': 'rgb(31, 119, 180)',
                      'hoverinfo': 'text',
                      'line': {'color': 'rgb(0, 0, 0)',
                               'shape': 'spline',
@@ -1692,7 +1700,7 @@ class TestViolin(NumpyTestUtilsMixin, TestCase):
                                      1.96969697,  1.97979798,  1.98989899,
                                      2.])},
                      {'fill': 'tonextx',
-                      'fillcolor': 'rgb(31.0, 119.0, 180.0)',
+                      'fillcolor': 'rgb(31, 119, 180)',
                       'hoverinfo': 'text',
                       'line': {'color': 'rgb(0, 0, 0)',
                                'shape': 'spline',
@@ -1892,7 +1900,7 @@ class TestViolin(NumpyTestUtilsMixin, TestCase):
                       'x': [0],
                       'y': [1.5]},
                      {'hoverinfo': 'y',
-                      'marker': {'color': 'rgb(31.0, 119.0, 180.0)',
+                      'marker': {'color': 'rgb(31, 119, 180)',
                                  'symbol': 'line-ew-open'},
                       'mode': 'markers',
                       'name': '',

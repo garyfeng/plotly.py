@@ -14,7 +14,9 @@ import warnings
 
 import six
 import math
+import decimal
 
+from plotly import colors
 from plotly import utils
 from plotly import exceptions
 from plotly import graph_reference
@@ -1477,6 +1479,211 @@ class FigureFactory(object):
     """
 
     @staticmethod
+    def _make_colorscale(colors, scale=None):
+        """
+        Makes a colorscale from a list of colors and scale
+
+        Takes a list of colors and scales and constructs a colorscale based
+        on the colors in sequential order. If 'scale' is left empty, a linear-
+        interpolated colorscale will be generated. If 'scale' is a specificed
+        list, it must be the same legnth as colors and must contain all floats
+        For documentation regarding to the form of the output, see
+        https://plot.ly/python/reference/#mesh3d-colorscale
+        """
+        colorscale = []
+
+        if not scale:
+            for j, color in enumerate(colors):
+                colorscale.append([j * 1./(len(colors) - 1), color])
+            return colorscale
+
+        else:
+            colorscale = [list(tup) for tup in zip(scale, colors)]
+            return colorscale
+
+    @staticmethod
+    def _convert_colorscale_to_rgb(colorscale):
+        """
+        Converts the colors in a colorscale to rgb colors
+
+        A colorscale is an array of arrays, each with a numeric value as the
+        first item and a color as the second. This function specifically is
+        converting a colorscale with tuple colors (each coordinate between 0
+        and 1) into a colorscale with the colors transformed into rgb colors
+        """
+        for color in colorscale:
+            color[1] = FigureFactory._convert_to_RGB_255(
+                color[1]
+            )
+
+        for color in colorscale:
+            color[1] = FigureFactory._label_rgb(
+                color[1]
+            )
+        return colorscale
+
+    @staticmethod
+    def _make_linear_colorscale(colors):
+        """
+        Makes a list of colors into a colorscale-acceptable form
+
+        For documentation regarding to the form of the output, see
+        https://plot.ly/python/reference/#mesh3d-colorscale
+        """
+        scale = 1./(len(colors) - 1)
+        return[[i * scale, color] for i, color in enumerate(colors)]
+
+    @staticmethod
+    def create_2D_density(x, y, colorscale='Earth', ncontours=20,
+                          hist_color=(0, 0, 0.5), point_color=(0, 0, 0.5),
+                          point_size=2, title='2D Density Plot',
+                          height=600, width=600):
+        """
+        Returns figure for a 2D density plot
+
+        :param (list|array) x: x-axis data for plot generation
+        :param (list|array) y: y-axis data for plot generation
+        :param (str|tuple|list) colorscale: either a plotly scale name, an rgb
+            or hex color, a color tuple or a list or tuple of colors. An rgb
+            color is of the form 'rgb(x, y, z)' where x, y, z belong to the
+            interval [0, 255] and a color tuple is a tuple of the form
+            (a, b, c) where a, b and c belong to [0, 1]. If colormap is a
+            list, it must contain the valid color types aforementioned as its
+            members.
+        :param (int) ncontours: the number of 2D contours to draw on the plot
+        :param (str) hist_color: the color of the plotted histograms
+        :param (str) point_color: the color of the scatter points
+        :param (str) point_size: the color of the scatter points
+        :param (str) title: set the title for the plot
+        :param (float) height: the height of the chart
+        :param (float) width: the width of the chart
+
+        Example 1: Simple 2D Density Plot
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        import numpy as np
+
+        # Make data points
+        t = np.linspace(-1,1.2,2000)
+        x = (t**3)+(0.3*np.random.randn(2000))
+        y = (t**6)+(0.3*np.random.randn(2000))
+
+        # Create a figure
+        fig = FF.create_2D_density(x, y)
+
+        # Plot the data
+        py.iplot(fig, filename='simple-2d-density')
+        ```
+
+        Example 2: Using Parameters
+        ```
+        import plotly.plotly as py
+        from plotly.tools import FigureFactory as FF
+
+        import numpy as np
+
+        # Make data points
+        t = np.linspace(-1,1.2,2000)
+        x = (t**3)+(0.3*np.random.randn(2000))
+        y = (t**6)+(0.3*np.random.randn(2000))
+
+        # Create custom colorscale
+        colorscale = ['#7A4579', '#D56073', 'rgb(236,158,105)',
+                      (1, 1, 0.2), (0.98,0.98,0.98)]
+
+        # Create a figure
+        fig = FF.create_2D_density(
+            x, y, colorscale=colorscale,
+            hist_color='rgb(255, 237, 222)', point_size=3)
+
+        # Plot the data
+        py.iplot(fig, filename='use-parameters')
+        ```
+        """
+        from plotly.graph_objs import graph_objs
+        from numbers import Number
+
+        # validate x and y are filled with numbers only
+        for array in [x, y]:
+            if not all(isinstance(element, Number) for element in array):
+                raise exceptions.PlotlyError(
+                    "All elements of your 'x' and 'y' lists must be numbers."
+                )
+
+        # validate x and y are the same length
+        if len(x) != len(y):
+            raise exceptions.PlotlyError(
+                "Both lists 'x' and 'y' must be the same length."
+            )
+
+        colorscale = FigureFactory._validate_colors(colorscale, 'rgb')
+        colorscale = FigureFactory._make_linear_colorscale(colorscale)
+
+        # validate hist_color and point_color
+        hist_color = FigureFactory._validate_colors(hist_color, 'rgb')
+        point_color = FigureFactory._validate_colors(point_color, 'rgb')
+
+        trace1 = graph_objs.Scatter(
+            x=x, y=y, mode='markers', name='points',
+            marker=dict(
+                color=point_color[0],
+                size=point_size,
+                opacity=0.4
+            )
+        )
+        trace2 = graph_objs.Histogram2dcontour(
+            x=x, y=y, name='density', ncontours=ncontours,
+            colorscale=colorscale, reversescale=True, showscale=False
+        )
+        trace3 = graph_objs.Histogram(
+            x=x, name='x density',
+            marker=dict(color=hist_color[0]), yaxis='y2'
+        )
+        trace4 = graph_objs.Histogram(
+            y=y, name='y density',
+            marker=dict(color=hist_color[0]), xaxis='x2'
+        )
+        data = [trace1, trace2, trace3, trace4]
+
+        layout = graph_objs.Layout(
+            showlegend=False,
+            autosize=False,
+            title=title,
+            height=height,
+            width=width,
+            xaxis=dict(
+                domain=[0, 0.85],
+                showgrid=False,
+                zeroline=False
+            ),
+            yaxis=dict(
+                domain=[0, 0.85],
+                showgrid=False,
+                zeroline=False
+            ),
+            margin=dict(
+                t=50
+            ),
+            hovermode='closest',
+            bargap=0,
+            xaxis2=dict(
+                domain=[0.85, 1],
+                showgrid=False,
+                zeroline=False
+            ),
+            yaxis2=dict(
+                domain=[0.85, 1],
+                showgrid=False,
+                zeroline=False
+            )
+        )
+
+        fig = graph_objs.Figure(data=data, layout=layout)
+        return fig
+
+    @staticmethod
     def _validate_gantt(df):
         """
         Validates the inputted dataframe or list
@@ -2525,7 +2732,7 @@ class FigureFactory(object):
         fig = make_subplots(rows=1, cols=L,
                             shared_yaxes=True,
                             horizontal_spacing=0.025,
-                            print_grid=True)
+                            print_grid=False)
         color_index = 0
         for k, gr in enumerate(group_name):
             vals = np.asarray(gb.get_group(gr)[data_header], np.float)
@@ -2563,7 +2770,8 @@ class FigureFactory(object):
 
     @staticmethod
     def _violin_colorscale(data, data_header, group_header, colors,
-                           use_colorscale, group_stats, height, width, title):
+                           use_colorscale, group_stats, height, width,
+                           title):
         """
         Refer to FigureFactory.create_violin() for docstring.
 
@@ -2593,7 +2801,7 @@ class FigureFactory(object):
         fig = make_subplots(rows=1, cols=L,
                             shared_yaxes=True,
                             horizontal_spacing=0.025,
-                            print_grid=True)
+                            print_grid=False)
 
         # prepare low and high color for colorscale
         lowcolor = FigureFactory._color_parser(
@@ -2694,7 +2902,7 @@ class FigureFactory(object):
         fig = make_subplots(rows=1, cols=L,
                             shared_yaxes=True,
                             horizontal_spacing=0.025,
-                            print_grid=True)
+                            print_grid=False)
 
         for k, gr in enumerate(group_name):
             vals = np.asarray(gb.get_group(gr)[data_header], np.float)
@@ -2972,15 +3180,14 @@ class FigureFactory(object):
         diff_1 = float(highcolor[1] - lowcolor[1])
         diff_2 = float(highcolor[2] - lowcolor[2])
 
-        inter_colors = (lowcolor[0] + intermed * diff_0,
-                        lowcolor[1] + intermed * diff_1,
-                        lowcolor[2] + intermed * diff_2)
-        return inter_colors
+        return (lowcolor[0] + intermed * diff_0,
+                lowcolor[1] + intermed * diff_1,
+                lowcolor[2] + intermed * diff_2)
 
     @staticmethod
     def _color_parser(colors, function):
         """
-        Takes color(s) and a function and applys the function on the color(s)
+        Takes color(s) and a function and applies the function on the color(s)
 
         In particular, this function identifies whether the given color object
         is an iterable or not and applies the given color-parsing function to
@@ -3015,14 +3222,12 @@ class FigureFactory(object):
         a value between 0 and 1
 
         """
-        un_rgb_color = (colors[0]/(255.0),
-                        colors[1]/(255.0),
-                        colors[2]/(255.0))
-
-        return un_rgb_color
+        return (colors[0]/(255.0),
+                colors[1]/(255.0),
+                colors[2]/(255.0))
 
     @staticmethod
-    def _map_face2color(face, colormap, vmin, vmax):
+    def _map_face2color(face, colormap, scale, vmin, vmax):
         """
         Normalize facecolor values by vmin/vmax and return rgb-color strings
 
@@ -3037,37 +3242,60 @@ class FigureFactory(object):
                                          "and vmax. The vmin value cannot be "
                                          "bigger than or equal to the value "
                                          "of vmax.")
-
         if len(colormap) == 1:
             # color each triangle face with the same color in colormap
             face_color = colormap[0]
-            face_color = FigureFactory._convert_to_RGB_255(face_color)
-            face_color = FigureFactory._label_rgb(face_color)
+            face_color = colors.convert_to_RGB_255(face_color)
+            face_color = colors.label_rgb(face_color)
+            return face_color
+        if face == vmax:
+            # pick last color in colormap
+            face_color = colormap[-1]
+            face_color = colors.convert_to_RGB_255(face_color)
+            face_color = colors.label_rgb(face_color)
+            return face_color
         else:
-            if face == vmax:
-                # pick last color in colormap
-                face_color = colormap[-1]
-                face_color = FigureFactory._convert_to_RGB_255(face_color)
-                face_color = FigureFactory._label_rgb(face_color)
-            else:
+            if scale is None:
                 # find the normalized distance t of a triangle face between
                 # vmin and vmax where the distance is between 0 and 1
                 t = (face - vmin) / float((vmax - vmin))
                 low_color_index = int(t / (1./(len(colormap) - 1)))
 
-                face_color = FigureFactory._find_intermediate_color(
+                face_color = colors.find_intermediate_color(
                     colormap[low_color_index],
                     colormap[low_color_index + 1],
-                    t * (len(colormap) - 1) - low_color_index)
-                face_color = FigureFactory._convert_to_RGB_255(face_color)
-                face_color = FigureFactory._label_rgb(face_color)
+                    t * (len(colormap) - 1) - low_color_index
+                )
 
-        return face_color
+                face_color = colors.convert_to_RGB_255(face_color)
+                face_color = colors.label_rgb(face_color)
+            else:
+                # find the face color for a non-linearly interpolated scale
+                t = (face - vmin) / float((vmax - vmin))
+
+                low_color_index = 0
+                for k in range(len(scale) - 1):
+                    if scale[k] <= t < scale[k+1]:
+                        break
+                    low_color_index += 1
+
+                low_scale_val = scale[low_color_index]
+                high_scale_val = scale[low_color_index + 1]
+
+                face_color = colors.find_intermediate_color(
+                    colormap[low_color_index],
+                    colormap[low_color_index + 1],
+                    (t - low_scale_val)/(high_scale_val - low_scale_val)
+                )
+
+                face_color = colors.convert_to_RGB_255(face_color)
+                face_color = colors.label_rgb(face_color)
+            return face_color
 
     @staticmethod
-    def _trisurf(x, y, z, simplices, colormap=None, color_func=None,
-                 plot_edges=False, x_edge=None, y_edge=None, z_edge=None,
-                 facecolor=None):
+    def _trisurf(x, y, z, simplices, show_colorbar, edges_color, scale,
+                 colormap=None, color_func=None, plot_edges=False,
+                 x_edge=None, y_edge=None, z_edge=None, facecolor=None):
         """
         Refer to FigureFactory.create_trisurf() for docstring
         """
@@ -3093,12 +3321,16 @@ class FigureFactory(object):
                 raise ValueError("If color_func is a list/array, it must "
                                  "be the same length as simplices.")
 
-            # convert all colors to rgb
+            # convert all colors in color_func to rgb
             for index in range(len(color_func)):
                 if isinstance(color_func[index], str):
                     if '#' in color_func[index]:
-                        foo = FigureFactory._hex_to_rgb(color_func[index])
-                        color_func[index] = FigureFactory._label_rgb(foo)
+                        foo = colors.hex_to_rgb(color_func[index])
+                        color_func[index] = colors.label_rgb(foo)
+
+                if isinstance(color_func[index], tuple):
+                    foo = colors.convert_to_RGB_255(color_func[index])
+                    color_func[index] = colors.label_rgb(foo)
 
             mean_dists = np.asarray(color_func)
         else:
@@ -3125,18 +3357,45 @@ class FigureFactory(object):
             for index in range(len(mean_dists)):
                 color = FigureFactory._map_face2color(mean_dists[index],
                                                       colormap,
+                                                      scale,
                                                       min_mean_dists,
                                                       max_mean_dists)
                 facecolor.append(color)
 
-        # Make sure we have arrays to speed up plotting
+        # Make sure facecolor is a list so output is consistent across Pythons
         facecolor = np.asarray(facecolor)
         ii, jj, kk = simplices.T
+
         triangles = graph_objs.Mesh3d(x=x, y=y, z=z, facecolor=facecolor,
                                       i=ii, j=jj, k=kk, name='')
 
-        if plot_edges is not True:  # the triangle sides are not plotted
-            return graph_objs.Data([triangles])
+        mean_dists_are_numbers = not isinstance(mean_dists[0], str)
+
+        if mean_dists_are_numbers and show_colorbar is True:
+            # make a colorscale from the colors
+            colorscale = colors.make_colorscale(colormap, scale)
+            colorscale = colors.convert_colorscale_to_rgb(colorscale)
+
+            colorbar = graph_objs.Scatter3d(
+                x=x[:1],
+                y=y[:1],
+                z=z[:1],
+                mode='markers',
+                marker=dict(
+                    size=0.1,
+                    color=[min_mean_dists, max_mean_dists],
+                    colorscale=colorscale,
+                    showscale=True),
+                hoverinfo='None',
+                showlegend=False
+            )
+
+        # the triangle sides are not plotted
+        if plot_edges is False:
+            if mean_dists_are_numbers and show_colorbar is True:
+                return graph_objs.Data([triangles, colorbar])
+            else:
+                return graph_objs.Data([triangles])
 
         # define the lists x_edge, y_edge and z_edge, of x, y, resp z
         # coordinates of edge end points for each triangle
@@ -3173,19 +3432,26 @@ class FigureFactory(object):
         # define the lines for plotting
         lines = graph_objs.Scatter3d(
             x=x_edge, y=y_edge, z=z_edge, mode='lines',
-            line=graph_objs.Line(color='rgb(50, 50, 50)',
-                                 width=1.5)
+            line=graph_objs.Line(
+                color=edges_color,
+                width=1.5
+            ),
+            showlegend=False
         )
 
-        return graph_objs.Data([triangles, lines])
+        if mean_dists_are_numbers and show_colorbar is True:
+            return graph_objs.Data([triangles, lines, colorbar])
+        else:
+            return graph_objs.Data([triangles, lines])
 
     @staticmethod
-    def create_trisurf(x, y, z, simplices, colormap=None, color_func=None,
-                       title='Trisurf Plot', plot_edges=True,
-                       showbackground=True,
+    def create_trisurf(x, y, z, simplices, colormap=None, show_colorbar=True,
+                       scale=None, color_func=None, title='Trisurf Plot',
+                       plot_edges=True, showbackground=True,
                        backgroundcolor='rgb(230, 230, 230)',
                        gridcolor='rgb(255, 255, 255)',
                        zerolinecolor='rgb(255, 255, 255)',
+                       edges_color='rgb(50, 50, 50)',
                        height=800, width=800,
                        aspectratio=dict(x=1, y=1, z=1)):
         """
@@ -3202,11 +3468,15 @@ class FigureFactory(object):
             of the form 'rgb(x, y, z)' where x, y, z belong to the interval
             [0, 255] and a color tuple is a tuple of the form (a, b, c) where
             a, b and c belong to [0, 1]. If colormap is a list, it must
-            contain the valid color types aforementioned as its members.
+            contain the valid color types aforementioned as its members
+        :param (bool) show_colorbar: determines if colorbar is visible
+        :param (list|array) scale: sets the scale values to be used if a non-
+            linearly interpolated colormap is desired. If left as None, a
+            linear interpolation between the colors will be excecuted
         :param (function|list) color_func: The parameter that determines the
             coloring of the surface. Takes either a function with 3 arguments
             x, y, z or a list/array of color values the same length as
-            simplices. If set to None, color will only depend on the z axis
+            simplices. If None, coloring will only depend on the z axis
         :param (str) title: title of the plot
         :param (bool) plot_edges: determines if the triangles on the trisurf
             are visible
@@ -3218,6 +3488,7 @@ class FigureFactory(object):
             inclusive
         :param (str) zerolinecolor: color of the axes. Takes a string of the
             form 'rgb(x,y,z)' x,y,z are between 0 and 255 inclusive
+        :param (str) edges_color: color of the edges, if plot_edges is True
         :param (int|float) height: the height of the plot (in pixels)
         :param (int|float) width: the width of the plot (in pixels)
         :param (dict) aspectratio: a dictionary of the aspect ratio values for
@@ -3250,10 +3521,10 @@ class FigureFactory(object):
 
         # Create a figure
         fig1 = FF.create_trisurf(x=x, y=y, z=z,
-                                 colormap="Blues",
+                                 colormap="Rainbow",
                                  simplices=simplices)
         # Plot the data
-        py.iplot(fig1, filename='Trisurf Plot - Sphere')
+        py.iplot(fig1, filename='trisurf-plot-sphere')
         ```
 
         Example 2: Torus
@@ -3283,10 +3554,10 @@ class FigureFactory(object):
 
         # Create a figure
         fig1 = FF.create_trisurf(x=x, y=y, z=z,
-                                 colormap="Portland",
+                                 colormap="Viridis",
                                  simplices=simplices)
         # Plot the data
-        py.iplot(fig1, filename='Trisurf Plot - Torus')
+        py.iplot(fig1, filename='trisurf-plot-torus')
         ```
 
         Example 3: Mobius Band
@@ -3317,10 +3588,10 @@ class FigureFactory(object):
 
         # Create a figure
         fig1 = FF.create_trisurf(x=x, y=y, z=z,
-                                 colormap=[(0.2, 0.4, 0.6),(1, 1, 1)],
+                                 colormap=[(0.2, 0.4, 0.6), (1, 1, 1)],
                                  simplices=simplices)
         # Plot the data
-        py.iplot(fig1, filename='Trisurf Plot - Mobius Band')
+        py.iplot(fig1, filename='trisurf-plot-mobius-band')
         ```
 
         Example 4: Using a Custom Colormap Function with Light Cone
@@ -3354,13 +3625,14 @@ class FigureFactory(object):
 
         # Create a figure
         fig1 = FF.create_trisurf(x=x, y=y, z=z,
-                                 colormap=['#604d9e',
-                                           'rgb(50, 150, 255)',
-                                           (0.2, 0.2, 0.8)],
+                                 colormap=['#FFFFFF', '#E4FFFE',
+                                           '#A4F6F9', '#FF99FE',
+                                           '#BA52ED'],
+                                 scale=[0, 0.6, 0.71, 0.89, 1],
                                  simplices=simplices,
                                  color_func=dist_origin)
         # Plot the data
-        py.iplot(fig1, filename='Trisurf Plot - Custom Coloring')
+        py.iplot(fig1, filename='trisurf-plot-custom-coloring')
         ```
 
         Example 5: Enter color_func as a list of colors
@@ -3399,21 +3671,31 @@ class FigureFactory(object):
         fig = FF.create_trisurf(
             x, y, z, simplices,
             color_func=colors,
+            show_colorbar=True,
+            edges_color='rgb(2, 85, 180)',
             title=' Modern Art'
         )
 
-        py.iplot(fig, filename="Modern Art")
+        py.iplot(fig, filename="trisurf-plot-modern-art")
         ```
         """
         from plotly.graph_objs import graph_objs
 
         # Validate colormap
-        colormap = FigureFactory._validate_colors(colormap, 'tuple')
+        colors.validate_colors(colormap)
+        colormap, scale = colors.convert_colors_to_same_type(
+            colormap, colortype='tuple',
+            return_default_colors=True, scale=scale
+        )
 
         data1 = FigureFactory._trisurf(x, y, z, simplices,
+                                       show_colorbar=show_colorbar,
                                        color_func=color_func,
                                        colormap=colormap,
+                                       scale=scale,
+                                       edges_color=edges_color,
                                        plot_edges=plot_edges)
+
         axis = dict(
             showbackground=showbackground,
             backgroundcolor=backgroundcolor,
@@ -3434,6 +3716,7 @@ class FigureFactory(object):
                     z=aspectratio['z']),
                 )
         )
+
         return graph_objs.Figure(data=data1, layout=layout)
 
     @staticmethod
@@ -3447,7 +3730,7 @@ class FigureFactory(object):
         """
         from plotly.graph_objs import graph_objs
         dim = len(dataframe)
-        fig = make_subplots(rows=dim, cols=dim)
+        fig = make_subplots(rows=dim, cols=dim, print_grid=False)
         trace_list = []
         # Insert traces into trace_list
         for listy in dataframe:
@@ -3528,7 +3811,7 @@ class FigureFactory(object):
 
         theme = colormap
         dim = len(dataframe)
-        fig = make_subplots(rows=dim, cols=dim)
+        fig = make_subplots(rows=dim, cols=dim, print_grid=False)
         trace_list = []
         legend_param = 0
         # Work over all permutations of list pairs
@@ -3714,7 +3997,7 @@ class FigureFactory(object):
                 theme = colormap
 
             dim = len(dataframe)
-            fig = make_subplots(rows=dim, cols=dim)
+            fig = make_subplots(rows=dim, cols=dim, print_grid=False)
             trace_list = []
             legend_param = 0
             # Work over all permutations of list pairs
@@ -3888,7 +4171,7 @@ class FigureFactory(object):
                     theme = colormap
 
                 dim = len(dataframe)
-                fig = make_subplots(rows=dim, cols=dim)
+                fig = make_subplots(rows=dim, cols=dim, print_grid=False)
                 trace_list = []
                 legend_param = 0
                 # Work over all permutations of list pairs
@@ -4052,7 +4335,7 @@ class FigureFactory(object):
                     color.append([1./(len(theme)-1)*incr, theme[incr]])
 
                 dim = len(dataframe)
-                fig = make_subplots(rows=dim, cols=dim)
+                fig = make_subplots(rows=dim, cols=dim, print_grid=False)
                 trace_list = []
                 legend_param = 0
                 # Run through all permutations of list pairs
@@ -4337,9 +4620,24 @@ class FigureFactory(object):
     def _convert_to_RGB_255(colors):
         """
         Multiplies each element of a triplet by 255
-        """
 
-        return (colors[0]*255.0, colors[1]*255.0, colors[2]*255.0)
+        Each coordinate of the color tuple is rounded to the nearest float and
+        then is turned into an integer. If a number is of the form x.5, then
+        if x is odd, the number rounds up to (x+1). Otherwise, it rounds down
+        to just x. This is the way rounding works in Python 3 and in current
+        statistical analysis to avoid rounding bias
+        """
+        rgb_components = []
+
+        for component in colors:
+            rounded_num = decimal.Decimal(str(component*255.0)).quantize(
+                decimal.Decimal('1'), rounding=decimal.ROUND_HALF_EVEN
+            )
+            # convert rounded number to an integer from 'Decimal' form
+            rounded_num = int(rounded_num)
+            rgb_components.append(rounded_num)
+
+        return (rgb_components[0], rgb_components[1], rgb_components[2])
 
     @staticmethod
     def _n_colors(lowcolor, highcolor, n_colors):

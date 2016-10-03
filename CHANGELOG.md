@@ -2,6 +2,58 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.12.9] - 2016-08-22
+### Fixed
+- the colorbar in `.create_trisurf` now displays properly in `offline mode`.
+
+### Updated
+- the colorbar in `.create_trisurf` now displays the appropriate max and min values on the ends of the bar which corresponding to the coloring metric of the figure 
+- `edges_color` is now a param in `.create_trisurf` which only takes `rgb` values at the moment
+
+## [1.12.8] - 2016-08-18
+### Fixed
+- Fixed color bug with trisurf plots where certain triangles were colored strangely. The coordinates of `rgb(...)` are now rounded to their nearest integer (using Python3 method of rounding), then placed in the color string to fix the issue.   
+
+## [1.12.7] - 2016-08-17
+### Fixed
+- Edited `plotly.min.js` due to issue using `iplot` to plot offline in Jupyter Notebooks
+	- Please note that `plotly.min.js` may be cached in your Jupyter Notebook. Therefore, if you continue to experience this issue after upgrading the Plotly package please open a new notebook or clear the cache to ensure the correct `plotly.min.js` is referenced. 
+
+## [1.12.6] - 2016-08-09
+### Updated
+- Updated `plotly.min.js` from 1.14.1 to 1.16.2
+	- Trace type scattermapbox is now part of the main bundle
+	- Add updatemenus (aka dropdowns) layout components
+	- See [the plotly.js CHANGELOG](https://github.com/plotly/plotly.js/blob/master/CHANGELOG.md) for additional information regarding the updates
+
+## [1.12.5] - 2016-08-03
+### Updated
+- `.create_trisurf` now supports a visible colorbar for the trisurf plots. Check out the docs for help:
+```
+import plotly.tools as tls
+help(tls.FigureFactory.create_trisurf)
+```
+
+## [1.12.4] - 2016-07-14
+### Added
+- The FigureFactory can now create 2D-density charts with `.create_2D_density`. Check it out with:
+```
+import plotly.tools as tls
+help(tls.FigureFactory.create_2D_density)
+```
+
+## [1.12.3] - 2016-06-30
+### Updated
+- Updated `plotly.min.js` from 1.13.0 to 1.14.1
+	- Numerous additions and changes where made to the mapbox layout layers attributes
+	- Attribute line.color in scatter3d traces now support color scales
+	- Layout shapes can now be moved and resized (except for 'path' shapes) in editable contexts
+	- See [the plotly.js CHANGELOG](https://github.com/plotly/plotly.js/blob/master/CHANGELOG.md#1141----2016-06-28) for additional information regarding the updates
+- Updated `default-schema`
+
+### Added
+- Added `update_plotlyjs_for_offline` in makefile in order to automate updating `plotly.min.js` for offline mode
+
 ## [1.12.2] - 2016-06-20
 ### Updated
 - Updated plotly.min.js so the offline mode is using plotly.js v1.13.0
